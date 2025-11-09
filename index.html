@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy Golf 2026 - Moraga Country Club</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏌️ Fantasy Golf 2026</h1>
+            <h2>Moraga Country Club - Best Scores</h2>
+        </header>
+
+        <div class="controls">
+            <button id="addPlayerBtn" class="btn btn-primary">+ Add Player</button>
+            <button id="uploadScorecardBtn" class="btn btn-secondary">📷 Upload Scorecard</button>
+            <input type="file" id="scorecardUpload" accept="image/*" style="display: none;">
+            <button id="resetBtn" class="btn btn-danger">Reset All Scores</button>
+        </div>
+
+        <div id="scorecardContainer">
+            <!-- Scorecard will be dynamically generated here -->
+        </div>
+
+        <footer>
+            <p>Track your best score on each hole throughout 2026!</p>
+        </footer>
+    </div>
+
+    <!-- Modal for editing score -->
+    <div id="scoreModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Update Score</h3>
+            <p id="modalInfo"></p>
+            <input type="number" id="scoreInput" min="1" max="15" placeholder="Enter score">
+            <div class="modal-buttons">
+                <button id="saveScoreBtn" class="btn btn-primary">Save</button>
+                <button id="cancelScoreBtn" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for adding player -->
+    <div id="playerModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Add New Player</h3>
+            <input type="text" id="playerNameInput" placeholder="Enter player name">
+            <div class="modal-buttons">
+                <button id="savePlayerBtn" class="btn btn-primary">Add Player</button>
+                <button id="cancelPlayerBtn" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OCR Processing Modal -->
+    <div id="ocrModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Processing Scorecard...</h3>
+            <div id="ocrProgress">
+                <p>Analyzing image...</p>
+                <div class="progress-bar">
+                    <div id="progressFill"></div>
+                </div>
+            </div>
+            <div id="ocrResults" style="display: none;">
+                <h4>Select Player and Scores:</h4>
+                <select id="ocrPlayerSelect"></select>
+                <div id="extractedScores"></div>
+                <div class="modal-buttons">
+                    <button id="applyOcrBtn" class="btn btn-primary">Apply Scores</button>
+                    <button id="cancelOcrBtn" class="btn btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

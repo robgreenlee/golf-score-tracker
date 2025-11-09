@@ -1,0 +1,333 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    padding: 30px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 3px solid #1e3c72;
+}
+
+header h1 {
+    color: #1e3c72;
+    font-size: 2.5em;
+    margin-bottom: 10px;
+}
+
+header h2 {
+    color: #2a5298;
+    font-size: 1.3em;
+    font-weight: normal;
+}
+
+.controls {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-primary {
+    background: #28a745;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+}
+
+.btn-secondary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #0056b3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+}
+
+#scorecardContainer {
+    overflow-x: auto;
+    margin-bottom: 20px;
+}
+
+.scorecard {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 800px;
+}
+
+.scorecard th,
+.scorecard td {
+    padding: 12px;
+    text-align: center;
+    border: 2px solid #ddd;
+}
+
+.scorecard th {
+    background: #1e3c72;
+    color: white;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.9em;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.scorecard .hole-header {
+    background: #2a5298;
+}
+
+.scorecard .player-name {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #1e3c72;
+    text-align: left;
+    position: relative;
+}
+
+.player-name .remove-player {
+    float: right;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 0.8em;
+}
+
+.player-name .remove-player:hover {
+    background: #c82333;
+}
+
+.scorecard .score-cell {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 600;
+    font-size: 1.1em;
+}
+
+.scorecard .score-cell:hover {
+    background: #e3f2fd;
+    transform: scale(1.05);
+}
+
+.scorecard .score-cell.empty {
+    color: #ccc;
+}
+
+.scorecard .total-cell {
+    background: #ffc107;
+    font-weight: 700;
+    font-size: 1.2em;
+    color: #1e3c72;
+}
+
+.scorecard .par-row {
+    background: #e8f5e9;
+    font-weight: 600;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-content {
+    background-color: white;
+    margin: 10% auto;
+    padding: 30px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+    animation: slideIn 0.3s;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 20px;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+}
+
+.modal-content h3 {
+    color: #1e3c72;
+    margin-bottom: 20px;
+}
+
+.modal-content input[type="text"],
+.modal-content input[type="number"],
+.modal-content select {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 1em;
+}
+
+.modal-content input[type="text"]:focus,
+.modal-content input[type="number"]:focus,
+.modal-content select:focus {
+    outline: none;
+    border-color: #2a5298;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    justify-content: flex-end;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 30px;
+    background: #e0e0e0;
+    border-radius: 15px;
+    overflow: hidden;
+    margin-top: 15px;
+}
+
+#progressFill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+#extractedScores {
+    margin: 15px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.score-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px;
+    margin: 5px 0;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+footer {
+    text-align: center;
+    color: #666;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 2px solid #eee;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding: 15px;
+    }
+
+    header h1 {
+        font-size: 1.8em;
+    }
+
+    header h2 {
+        font-size: 1em;
+    }
+
+    .controls {
+        flex-direction: column;
+    }
+
+    .btn {
+        width: 100%;
+    }
+
+    .scorecard th,
+    .scorecard td {
+        padding: 8px;
+        font-size: 0.9em;
+    }
+}
