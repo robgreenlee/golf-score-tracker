@@ -149,18 +149,42 @@ header h2 {
 }
 
 .scorecard .score-cell {
-    cursor: pointer;
+    padding: 4px;
     transition: all 0.2s ease;
-    font-weight: 600;
-    font-size: 1.1em;
 }
 
 .scorecard .score-cell:hover {
     background: #e3f2fd;
-    transform: scale(1.05);
 }
 
-.scorecard .score-cell.empty {
+/* Inline score input */
+.score-input {
+    width: 100%;
+    height: 36px;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 1.1em;
+    background: transparent;
+    color: #333;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.score-input:hover {
+    border-color: #ccc;
+    background: #f8f9fa;
+}
+
+.score-input:focus {
+    outline: none;
+    border-color: #2a5298;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.2);
+}
+
+.score-input::placeholder {
     color: #ccc;
 }
 
@@ -329,5 +353,10 @@ footer {
     .scorecard td {
         padding: 8px;
         font-size: 0.9em;
+    }
+
+    .score-input {
+        height: 32px;
+        font-size: 1em;
     }
 }
