@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy Golf 2026 - Demo Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #1e3c72;
+        }
+
+        header h1 {
+            color: #1e3c72;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        header h2 {
+            color: #2a5298;
+            font-size: 1.3em;
+            font-weight: normal;
+        }
+
+        .demo-note {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .demo-note strong {
+            color: #856404;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .scorecard {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .scorecard th,
+        .scorecard td {
+            padding: 12px;
+            text-align: center;
+            border: 2px solid #ddd;
+        }
+
+        .scorecard th {
+            background: #1e3c72;
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+
+        .scorecard .hole-header {
+            background: #2a5298;
+        }
+
+        .scorecard .player-name {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #1e3c72;
+            text-align: left;
+        }
+
+        .scorecard .score-cell {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .scorecard .score-cell:hover {
+            background: #e3f2fd;
+            transform: scale(1.05);
+        }
+
+        .scorecard .score-cell.empty {
+            color: #ccc;
+        }
+
+        .scorecard .total-cell {
+            background: #ffc107;
+            font-weight: 700;
+            font-size: 1.2em;
+            color: #1e3c72;
+        }
+
+        .scorecard .par-row {
+            background: #e8f5e9;
+            font-weight: 600;
+        }
+
+        footer {
+            text-align: center;
+            color: #666;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #eee;
+        }
+
+        .instructions {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .instructions h3 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .instructions ul {
+            margin-left: 20px;
+        }
+
+        .instructions li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏌️ Fantasy Golf 2026</h1>
+            <h2>Moraga Country Club - Best Scores</h2>
+        </header>
+
+        <div class="demo-note">
+            <strong>📋 DEMO PREVIEW</strong><br>
+            This is a static preview. Download the full app to interact with it!
+        </div>
+
+        <div class="instructions">
+            <h3>How This App Works:</h3>
+            <ul>
+                <li><strong>Click any score cell</strong> to update a player's score for that hole</li>
+                <li><strong>Upload Scorecard</strong> button lets you take a photo and auto-extract scores (OCR)</li>
+                <li><strong>Add Player</strong> to add new players to the group</li>
+                <li><strong>Best scores only:</strong> The app only keeps your best score per hole</li>
+                <li><strong>Running totals:</strong> See the sum of all recorded scores</li>
+            </ul>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary">+ Add Player</button>
+            <button class="btn btn-secondary">📷 Upload Scorecard</button>
+            <button class="btn btn-danger">Reset All Scores</button>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table class="scorecard">
+                <tr>
+                    <th>Player</th>
+                    <th class="hole-header">1</th>
+                    <th class="hole-header">2</th>
+                    <th class="hole-header">3</th>
+                    <th class="hole-header">4</th>
+                    <th class="hole-header">5</th>
+                    <th class="hole-header">6</th>
+                    <th class="hole-header">7</th>
+                    <th class="hole-header">8</th>
+                    <th class="hole-header">9</th>
+                    <th class="hole-header">10</th>
+                    <th class="hole-header">11</th>
+                    <th class="hole-header">12</th>
+                    <th class="hole-header">13</th>
+                    <th class="hole-header">14</th>
+                    <th class="hole-header">15</th>
+                    <th class="hole-header">16</th>
+                    <th class="hole-header">17</th>
+                    <th class="hole-header">18</th>
+                    <th>Total</th>
+                </tr>
+                <tr class="par-row">
+                    <td><strong>Par</strong></td>
+                    <td>4</td>
+                    <td>4</td>
+                    <td>3</td>
+                    <td>5</td>
+                    <td>4</td>
+                    <td>4</td>
+                    <td>3</td>
+                    <td>4</td>
+                    <td>5</td>
+                    <td>4</td>
+                    <td>5</td>
+                    <td>4</td>
+                    <td>3</td>
+                    <td>4</td>
+                    <td>4</td>
+                    <td>3</td>
+                    <td>5</td>
+                    <td>4</td>
+                    <td><strong>72</strong></td>
+                </tr>
+                <tr>
+                    <td class="player-name">Rob</td>
+                    <td class="score-cell">4</td>
+                    <td class="score-cell">5</td>
+                    <td class="score-cell">3</td>
+                    <td class="score-cell">6</td>
+                    <td class="score-cell empty">—</td>
+                    <td class="score-cell">4</td>
+                    <td class="score-cell">2</td>
+                    <td class="score-cell empty">—</td>
+                    <td class="score-cell">5</td>
+                    <td class="score-cell">4</td>
+                    <td class="score-cell">6</td>
+                    <td class="score-cell empty">—</td>
+                    <td class="score-cell">3</td>
+                    <td class="score-cell">5</td>
+                    <td class="score-cell empty">—</td>
+                    <td class="score-cell">3</td>
+                    <td class="score-cell empty">—</td>
+                    <td class="score-cell">4</td>
+                    <td class="total-cell">54</td>
+                </tr>
+                <tr>
+                    <td class="player-name">Drew</td>
+                    <td class="score-cell">5</td>
+                    <td class="score-cell">4</td>
+                    <td class="score-cell">4</td>
+                    <td class="score-cell">5</td>
+                    <td class="score-cell">5</td>
+                    <td class="score-cell empty">—</td>
+                    <td class="score-cell">3</td>
+                    <td class="score-cell">4</td>
+                    <td class="score-cell empty">—</td>
+                    <td class="score-cell empty">—</td>
+                    <td class="score-cell">5</td>
+                    <td class="score-cell">3</td>
+                    <td class="score-cell empty">—</td>
+                    <td class="score-cell">4</td>
+                    <td class="score-cell">5</td>
+                    <td class="score-cell">2</td>
+                    <td class="score-cell">6</td>
+                    <td class="score-cell empty">—</td>
+                    <td class="total-cell">55</td>
+                </tr>
+                <tr>
+                    <td class="player-name">Mike</td>
+                    <td class="score-cell">3</td>
+                    <td class="score-cell empty">—</td>
+                    <td class="score-cell">3</td>
+                    <td class="score-cell">7</td>
+                    <td class="score-cell">4</td>
+                    <td class="score-cell">5</td>
+                    <td class="score-cell empty">—</td>
+                    <td class="score-cell">5</td>
+                    <td class="score-cell">6</td>
+                    <td class="score-cell">4</td>
+                    <td class="score-cell empty">—</td>
+                    <td class="score-cell">4</td>
+                    <td class="score-cell">2</td>
+                    <td class="score-cell empty">—</td>
+                    <td class="score-cell">4</td>
+                    <td class="score-cell">3</td>
+                    <td class="score-cell">5</td>
+                    <td class="score-cell">5</td>
+                    <td class="total-cell">60</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="instructions">
+            <h3>To Get the Full Interactive App:</h3>
+            <ul>
+                <li><strong>Option 1:</strong> Clone the repo: <code>git clone https://github.com/robgreenlee/golf-score-tracker.git</code></li>
+                <li><strong>Option 2:</strong> Download ZIP from GitHub</li>
+                <li><strong>Then:</strong> Open <code>index.html</code> in your browser</li>
+                <li><strong>Features:</strong> Click-to-edit scores, OCR scorecard upload, add/remove players, localStorage persistence</li>
+            </ul>
+        </div>
+
+        <footer>
+            <p>Track your best, play your best! 🏌️⛳</p>
+            <p style="margin-top: 10px; font-size: 0.9em;">This is a static preview - download the full app for interactive features</p>
+        </footer>
+    </div>
+</body>
+</html>
