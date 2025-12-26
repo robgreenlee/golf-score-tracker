@@ -17,7 +17,16 @@
             <button id="addPlayerBtn" class="btn btn-primary">+ Add Player</button>
             <button id="uploadScorecardBtn" class="btn btn-secondary">📷 Upload Scorecard</button>
             <input type="file" id="scorecardUpload" accept="image/*" style="display: none;">
-            <button id="resetBtn" class="btn btn-danger">Reset All Scores</button>
+            <div class="dropdown">
+                <button id="toolsBtn" class="btn btn-secondary">⚙️ Tools</button>
+                <div class="dropdown-content" id="toolsMenu">
+                    <button id="exportBtn">📤 Export Scores</button>
+                    <button id="importBtn">📥 Import Scores</button>
+                    <hr>
+                    <button id="resetBtn" class="danger">🗑️ Reset All Scores</button>
+                </div>
+            </div>
+            <input type="file" id="importUpload" accept=".json" style="display: none;">
         </div>
 
         <div id="scorecardContainer">

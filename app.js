@@ -62,6 +62,33 @@ class FantasyGolf {
             }
         });
 
+        // Tools Dropdown
+        document.getElementById('toolsBtn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('toolsMenu').classList.toggle('show');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', () => {
+            document.getElementById('toolsMenu').classList.remove('show');
+        });
+
+        // Export Button
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            this.exportScores();
+        });
+
+        // Import Button
+        document.getElementById('importBtn').addEventListener('click', () => {
+            document.getElementById('importUpload').click();
+        });
+
+        document.getElementById('importUpload').addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                this.importScores(e.target.files[0]);
+            }
+        });
+
         // Reset Button
         document.getElementById('resetBtn').addEventListener('click', () => {
             if (confirm('Are you sure you want to reset ALL scores? This cannot be undone.')) {
@@ -554,6 +581,64 @@ class FantasyGolf {
     hideOcrModal() {
         document.getElementById('ocrModal').style.display = 'none';
         document.getElementById('scorecardUpload').value = ''; // Reset file input
+    }
+
+    // Export/Import functionality
+    exportScores() {
+        const data = {
+            players: this.players,
+            parValues: this.parValues,
+            exportedAt: new Date().toISOString()
+        };
+
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `fantasy-golf-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    importScores(file) {
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+
+                if (!data.players || !Array.isArray(data.players)) {
+                    throw new Error('Invalid file format');
+                }
+
+                // Validate player data
+                for (const player of data.players) {
+                    if (!player.name || !Array.isArray(player.scores) || player.scores.length !== 18) {
+                        throw new Error('Invalid player data');
+                    }
+                }
+
+                if (confirm(`Import ${data.players.length} player(s)? This will replace your current data.`)) {
+                    this.players = data.players;
+                    if (data.parValues) {
+                        this.parValues = data.parValues;
+                    }
+                    this.saveData();
+                    this.render();
+                    alert('Scores imported successfully!');
+                }
+            } catch (error) {
+                alert('Failed to import scores. Please check the file format.');
+                console.error('Import error:', error);
+            }
+        };
+
+        reader.readAsText(file);
+        document.getElementById('importUpload').value = ''; // Reset file input
     }
 }
 
