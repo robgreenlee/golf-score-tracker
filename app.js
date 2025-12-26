@@ -158,6 +158,7 @@ class FantasyGolf {
         html += '</tr>';
 
         // Player rows
+        let tabIndex = 1;
         this.players.forEach((player, playerIndex) => {
             html += '<tr>';
             html += `<td class="player-name">
@@ -167,10 +168,19 @@ class FantasyGolf {
 
             for (let hole = 0; hole < this.holes; hole++) {
                 const score = player.scores[hole];
-                const isEmpty = score === null;
-                const cellClass = isEmpty ? 'score-cell empty' : 'score-cell';
-                const displayScore = isEmpty ? '—' : score;
-                html += `<td class="${cellClass}" data-player="${playerIndex}" data-hole="${hole}">${displayScore}</td>`;
+                const displayScore = score !== null ? score : '';
+                html += `<td class="score-cell" data-player="${playerIndex}" data-hole="${hole}">
+                    <input type="text"
+                           class="score-input"
+                           data-player="${playerIndex}"
+                           data-hole="${hole}"
+                           value="${displayScore}"
+                           tabindex="${tabIndex}"
+                           maxlength="2"
+                           inputmode="numeric"
+                           pattern="[0-9]*">
+                </td>`;
+                tabIndex++;
             }
 
             // Calculate total
@@ -182,14 +192,8 @@ class FantasyGolf {
         html += '</table>';
         container.innerHTML = html;
 
-        // Add click listeners to score cells
-        document.querySelectorAll('.score-cell').forEach(cell => {
-            cell.addEventListener('click', (e) => {
-                const playerIndex = parseInt(e.target.dataset.player);
-                const hole = parseInt(e.target.dataset.hole);
-                this.showScoreModal(playerIndex, hole);
-            });
-        });
+        // Add event listeners to inline score inputs
+        this.setupScoreInputListeners();
 
         // Add click listeners to remove buttons
         document.querySelectorAll('.remove-player').forEach(btn => {
@@ -199,6 +203,143 @@ class FantasyGolf {
                 this.removePlayer(playerIndex);
             });
         });
+    }
+
+    setupScoreInputListeners() {
+        document.querySelectorAll('.score-input').forEach(input => {
+            // Save on blur
+            input.addEventListener('blur', (e) => {
+                this.saveInlineScore(e.target);
+            });
+
+            // Handle keyboard navigation
+            input.addEventListener('keydown', (e) => {
+                const playerIndex = parseInt(e.target.dataset.player);
+                const hole = parseInt(e.target.dataset.hole);
+
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.saveInlineScore(e.target);
+                    this.moveToNextCell(playerIndex, hole);
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    this.saveInlineScore(e.target);
+                    this.moveToNextCell(playerIndex, hole);
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    this.saveInlineScore(e.target);
+                    this.moveToPrevCell(playerIndex, hole);
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.saveInlineScore(e.target);
+                    this.moveToNextPlayer(playerIndex, hole);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.saveInlineScore(e.target);
+                    this.moveToPrevPlayer(playerIndex, hole);
+                } else if (e.key === 'Escape') {
+                    e.target.blur();
+                }
+            });
+
+            // Select all text on focus
+            input.addEventListener('focus', (e) => {
+                e.target.select();
+            });
+
+            // Only allow numbers
+            input.addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/[^0-9]/g, '');
+            });
+        });
+    }
+
+    saveInlineScore(input) {
+        const playerIndex = parseInt(input.dataset.player);
+        const hole = parseInt(input.dataset.hole);
+        const newValue = input.value.trim();
+        const player = this.players[playerIndex];
+        const currentScore = player.scores[hole];
+
+        // If empty, clear the score
+        if (newValue === '') {
+            if (currentScore !== null) {
+                player.scores[hole] = null;
+                this.saveData();
+                this.updateTotal(playerIndex);
+            }
+            return;
+        }
+
+        const newScore = parseInt(newValue);
+
+        // Validate score
+        if (isNaN(newScore) || newScore < 1 || newScore > 15) {
+            input.value = currentScore !== null ? currentScore : '';
+            return;
+        }
+
+        // Only update if it's a new score or better than current best
+        if (currentScore === null || newScore <= currentScore) {
+            player.scores[hole] = newScore;
+            this.saveData();
+            this.updateTotal(playerIndex);
+        } else {
+            // Score is worse - revert to current
+            input.value = currentScore;
+        }
+    }
+
+    updateTotal(playerIndex) {
+        const player = this.players[playerIndex];
+        const total = this.calculateTotal(player);
+        const rows = document.querySelectorAll('.scorecard tr');
+        const playerRow = rows[playerIndex + 2]; // +2 for header and par rows
+        if (playerRow) {
+            const totalCell = playerRow.querySelector('.total-cell');
+            if (totalCell) {
+                totalCell.textContent = total !== null ? total : '—';
+            }
+        }
+    }
+
+    moveToNextCell(playerIndex, hole) {
+        const nextHole = hole + 1;
+        if (nextHole < this.holes) {
+            this.focusCell(playerIndex, nextHole);
+        } else if (playerIndex + 1 < this.players.length) {
+            // Move to first hole of next player
+            this.focusCell(playerIndex + 1, 0);
+        }
+    }
+
+    moveToPrevCell(playerIndex, hole) {
+        const prevHole = hole - 1;
+        if (prevHole >= 0) {
+            this.focusCell(playerIndex, prevHole);
+        } else if (playerIndex > 0) {
+            // Move to last hole of previous player
+            this.focusCell(playerIndex - 1, this.holes - 1);
+        }
+    }
+
+    moveToNextPlayer(playerIndex, hole) {
+        if (playerIndex + 1 < this.players.length) {
+            this.focusCell(playerIndex + 1, hole);
+        }
+    }
+
+    moveToPrevPlayer(playerIndex, hole) {
+        if (playerIndex > 0) {
+            this.focusCell(playerIndex - 1, hole);
+        }
+    }
+
+    focusCell(playerIndex, hole) {
+        const input = document.querySelector(`.score-input[data-player="${playerIndex}"][data-hole="${hole}"]`);
+        if (input) {
+            input.focus();
+        }
     }
 
     calculateTotal(player) {
