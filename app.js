@@ -6,9 +6,6 @@ class FantasyGolf {
         // Moraga Country Club par values (you can update these with actual values)
         this.parValues = [4, 4, 3, 5, 4, 4, 3, 4, 5, 4, 5, 4, 3, 4, 4, 3, 5, 4]; // Default par 72
 
-        this.currentEditingPlayer = null;
-        this.currentEditingHole = null;
-
         this.init();
     }
 
@@ -100,15 +97,6 @@ class FantasyGolf {
             }
         });
 
-        // Score Modal
-        document.getElementById('saveScoreBtn').addEventListener('click', () => {
-            this.saveScore();
-        });
-
-        document.getElementById('cancelScoreBtn').addEventListener('click', () => {
-            this.hideScoreModal();
-        });
-
         // Player Modal
         document.getElementById('savePlayerBtn').addEventListener('click', () => {
             this.addPlayer();
@@ -142,12 +130,6 @@ class FantasyGolf {
         });
 
         // Enter key to save in modals
-        document.getElementById('scoreInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.saveScore();
-            }
-        });
-
         document.getElementById('playerNameInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.addPlayer();
@@ -244,28 +226,29 @@ class FantasyGolf {
                 const playerIndex = parseInt(e.target.dataset.player);
                 const hole = parseInt(e.target.dataset.hole);
 
-                if (e.key === 'Enter') {
+                // Save before handling navigation
+                if (['Enter', 'ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
                     e.preventDefault();
                     this.saveInlineScore(e.target);
-                    this.moveToNextCell(playerIndex, hole);
-                } else if (e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    this.saveInlineScore(e.target);
-                    this.moveToNextCell(playerIndex, hole);
-                } else if (e.key === 'ArrowLeft') {
-                    e.preventDefault();
-                    this.saveInlineScore(e.target);
-                    this.moveToPrevCell(playerIndex, hole);
-                } else if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    this.saveInlineScore(e.target);
-                    this.moveToNextPlayer(playerIndex, hole);
-                } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    this.saveInlineScore(e.target);
-                    this.moveToPrevPlayer(playerIndex, hole);
-                } else if (e.key === 'Escape') {
-                    e.target.blur();
+                }
+
+                switch (e.key) {
+                    case 'Enter':
+                    case 'ArrowRight':
+                        this.moveToNextCell(playerIndex, hole);
+                        break;
+                    case 'ArrowLeft':
+                        this.moveToPrevCell(playerIndex, hole);
+                        break;
+                    case 'ArrowDown':
+                        this.moveToNextPlayer(playerIndex, hole);
+                        break;
+                    case 'ArrowUp':
+                        this.moveToPrevPlayer(playerIndex, hole);
+                        break;
+                    case 'Escape':
+                        e.target.blur();
+                        break;
                 }
             });
 
@@ -312,8 +295,10 @@ class FantasyGolf {
             this.saveData();
             this.updateTotal(playerIndex);
         } else {
-            // Score is worse - revert to current
+            // Score is worse - show feedback and revert
             input.value = currentScore;
+            input.classList.add('rejected');
+            setTimeout(() => input.classList.remove('rejected'), 300);
         }
     }
 
@@ -373,57 +358,6 @@ class FantasyGolf {
         const validScores = player.scores.filter(score => score !== null);
         if (validScores.length === 0) return null;
         return validScores.reduce((sum, score) => sum + score, 0);
-    }
-
-    showScoreModal(playerIndex, hole) {
-        this.currentEditingPlayer = playerIndex;
-        this.currentEditingHole = hole;
-
-        const player = this.players[playerIndex];
-        const currentScore = player.scores[hole];
-        const holeNumber = hole + 1;
-
-        document.getElementById('modalInfo').textContent =
-            `${player.name} - Hole ${holeNumber} (Par ${this.parValues[hole]})` +
-            (currentScore ? ` - Current Best: ${currentScore}` : '');
-
-        document.getElementById('scoreInput').value = currentScore || '';
-        document.getElementById('scoreModal').style.display = 'block';
-        document.getElementById('scoreInput').focus();
-    }
-
-    hideScoreModal() {
-        document.getElementById('scoreModal').style.display = 'none';
-        this.currentEditingPlayer = null;
-        this.currentEditingHole = null;
-    }
-
-    saveScore() {
-        const scoreInput = document.getElementById('scoreInput');
-        const newScore = parseInt(scoreInput.value);
-
-        if (!newScore || newScore < 1 || newScore > 15) {
-            alert('Please enter a valid score between 1 and 15');
-            return;
-        }
-
-        const player = this.players[this.currentEditingPlayer];
-        const currentScore = player.scores[this.currentEditingHole];
-
-        // Only update if it's a new score or better than current best
-        if (currentScore === null || newScore < currentScore) {
-            player.scores[this.currentEditingHole] = newScore;
-            this.saveData();
-            this.render();
-            this.hideScoreModal();
-        } else {
-            if (confirm(`Current best is ${currentScore}. The new score (${newScore}) is not better. Do you want to update anyway?`)) {
-                player.scores[this.currentEditingHole] = newScore;
-                this.saveData();
-                this.render();
-                this.hideScoreModal();
-            }
-        }
     }
 
     showPlayerModal() {

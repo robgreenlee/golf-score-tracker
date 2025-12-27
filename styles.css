@@ -269,6 +269,17 @@ header h2 {
     to { opacity: 1; }
 }
 
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+}
+
+.score-input.rejected {
+    animation: shake 0.3s ease;
+    border-color: #dc3545 !important;
+}
+
 .modal-content {
     background-color: white;
     margin: 10% auto;
