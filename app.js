@@ -563,17 +563,84 @@ class FantasyGolf {
     }
 
     extractScoresFromText(text) {
-        const lines = text.split('\n');
-        const scores = [];
-        const scorePattern = /\b([1-9]|1[0-5])\b/g;
+        console.log('OCR Raw Text:', text); // Debug logging
 
+        const lines = text.split('\n');
+        const numberRows = [];
+
+        // Extract rows of numbers from the OCR text
         for (const line of lines) {
-            const matches = line.match(scorePattern);
-            if (matches) {
-                scores.push(...matches.map(m => parseInt(m)));
+            // Match all numbers in the line
+            const matches = line.match(/\b\d+\b/g);
+            if (matches && matches.length >= 5) {
+                const numbers = matches.map(m => parseInt(m));
+                numberRows.push(numbers);
             }
         }
 
+        console.log('Number rows found:', numberRows); // Debug logging
+
+        // Filter out hole number rows and par rows to find score rows
+        const scoreRows = numberRows.filter(row => {
+            // Skip if too few numbers
+            if (row.length < 9) return false;
+
+            // Get first 9 numbers for analysis
+            const first9 = row.slice(0, 9);
+
+            // Check if this is a front 9 hole number row (1,2,3,4,5,6,7,8,9)
+            const isFront9Holes = first9.every((n, i) => n === i + 1);
+            if (isFront9Holes) return false;
+
+            // Check if this is a back 9 hole number row (10,11,12,13,14,15,16,17,18)
+            const isBack9Holes = first9.every((n, i) => n === i + 10);
+            if (isBack9Holes) return false;
+
+            // Check if this is a par row (all values 3-5, sum typically 34-37)
+            const allPars = first9.every(n => n >= 3 && n <= 5);
+            const sum = first9.reduce((a, b) => a + b, 0);
+            if (allPars && sum >= 33 && sum <= 38) return false;
+
+            // Check if all values could be golf scores (1-15)
+            const allValidScores = first9.every(n => n >= 1 && n <= 15);
+            if (!allValidScores) return false;
+
+            return true;
+        });
+
+        console.log('Score rows found:', scoreRows); // Debug logging
+
+        // Extract 18 scores from the found score rows
+        const scores = [];
+
+        if (scoreRows.length >= 2) {
+            // Standard format: front 9 and back 9 on separate rows
+            scores.push(...scoreRows[0].slice(0, 9));
+            scores.push(...scoreRows[1].slice(0, 9));
+        } else if (scoreRows.length === 1 && scoreRows[0].length >= 18) {
+            // All 18 scores on one row
+            scores.push(...scoreRows[0].slice(0, 18));
+        } else if (scoreRows.length === 1) {
+            // Only found 9 scores
+            scores.push(...scoreRows[0].slice(0, 9));
+        }
+
+        // If we didn't find structured data, fall back to finding any valid scores
+        if (scores.length === 0) {
+            const allNumbers = text.match(/\b([1-9]|1[0-5])\b/g);
+            if (allNumbers) {
+                // Try to skip the first ~18 numbers (likely hole numbers + par)
+                // and take the next 18 as scores
+                const nums = allNumbers.map(n => parseInt(n));
+                if (nums.length >= 36) {
+                    scores.push(...nums.slice(18, 36));
+                } else {
+                    scores.push(...nums.slice(0, 18));
+                }
+            }
+        }
+
+        console.log('Final extracted scores:', scores); // Debug logging
         return scores.slice(0, 18);
     }
 
