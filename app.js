@@ -654,6 +654,47 @@ class FantasyGolf {
             }
         }
 
+        // If we found front 9 but not back 9, try to find back 9 scores after front 9
+        if (scores.length === 9 && front9Anchor !== -1) {
+            console.log('Front 9 found, searching for back 9 after it...');
+            // Back 9 section starts after front 9 scores + total
+            // Look for next valid score sequence after position front9Anchor + 30
+            const searchStart = front9Anchor + 30;
+
+            // Try multiple offsets in case structure varies slightly
+            for (let offset = 19; offset <= 25; offset++) {
+                for (let i = searchStart; i <= numbers.length - 9 - offset; i++) {
+                    const slice = numbers.slice(i, i + 9);
+                    // Check if this looks like back 9 hole numbers (starts with 10)
+                    if (slice[0] === 10) {
+                        const potentialScores = numbers.slice(i + offset, i + offset + 9);
+                        console.log(`Trying back 9 at index ${i} with offset ${offset}:`, potentialScores);
+                        if (potentialScores.length === 9 &&
+                            potentialScores.every(s => s >= 1 && s <= 15)) {
+                            scores.push(...potentialScores);
+                            console.log('Found back 9 scores:', potentialScores);
+                            return scores;
+                        }
+                    }
+                }
+            }
+
+            // Alternative: Just find next 9 valid scores after front 9 total
+            const front9End = front9Anchor + 29; // holes(9) + par(10) + scores(9) + total(1)
+            for (let i = front9End; i <= numbers.length - 9; i++) {
+                const candidate = numbers.slice(i, i + 9);
+                // Skip if this looks like hole numbers or par
+                if (candidate[0] >= 10 && candidate[0] <= 18) continue; // hole numbers
+                if (candidate.every(n => n >= 3 && n <= 5)) continue; // par values
+
+                if (candidate.every(s => s >= 1 && s <= 15)) {
+                    console.log('Found back 9 by scanning:', candidate);
+                    scores.push(...candidate);
+                    break;
+                }
+            }
+        }
+
         return scores;
     }
 
