@@ -4,7 +4,7 @@ class FantasyGolf {
         this.players = [];
         this.holes = 18;
         // Moraga Country Club par values (you can update these with actual values)
-        this.parValues = [4, 4, 3, 5, 4, 4, 3, 4, 5, 4, 5, 4, 3, 4, 4, 3, 5, 4]; // Default par 72
+        this.parValues = [4, 4, 4, 4, 3, 4, 3, 4, 5, 3, 4, 4, 5, 5, 3, 4, 3, 5]; // Moraga CC (Par 72)
 
         this.init();
     }
