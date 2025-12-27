@@ -1,21 +1,132 @@
-// Fantasy Golf 2026 - Main Application
+// Fantasy Golf 2026 - Main Application with Firebase Sync
+
+// Firebase Configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyD0FJMW81tgz65zuU7N5fOcRstF1tJKhN0",
+    authDomain: "fantasy-golf-71ebf.firebaseapp.com",
+    databaseURL: "https://fantasy-golf-71ebf-default-rtdb.firebaseio.com",
+    projectId: "fantasy-golf-71ebf",
+    storageBucket: "fantasy-golf-71ebf.firebasestorage.app",
+    messagingSenderId: "369426324814",
+    appId: "1:369426324814:web:718f09e8d4f1273b35121f"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
 class FantasyGolf {
     constructor() {
         this.players = [];
         this.holes = 18;
-        // Moraga Country Club par values (you can update these with actual values)
         this.parValues = [4, 4, 4, 4, 3, 4, 3, 4, 5, 3, 4, 4, 5, 5, 3, 4, 3, 5]; // Moraga CC (Par 72)
+        this.isOnline = false;
+        this.isSyncing = false;
 
         this.init();
     }
 
     init() {
-        this.loadData();
+        this.setupFirebase();
         this.setupEventListeners();
-        this.render();
     }
 
-    loadData() {
+    // Firebase Setup and Sync
+    setupFirebase() {
+        const dataRef = database.ref('golfData');
+        const statusEl = document.getElementById('syncStatus');
+
+        // Listen for connection state
+        database.ref('.info/connected').on('value', (snapshot) => {
+            this.isOnline = snapshot.val() === true;
+            this.updateSyncStatus();
+        });
+
+        // Listen for data changes (real-time sync)
+        dataRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                this.players = data.players || [];
+                if (data.parValues) {
+                    this.parValues = data.parValues;
+                }
+                // Also save to localStorage as backup
+                this.saveToLocalStorage();
+                this.render();
+                this.updateSyncStatus('synced');
+            } else {
+                // No data in Firebase, load from localStorage or use defaults
+                this.loadFromLocalStorage();
+                this.render();
+                // Push initial data to Firebase
+                if (this.players.length > 0) {
+                    this.saveToFirebase();
+                }
+            }
+        }, (error) => {
+            console.error('Firebase read error:', error);
+            this.loadFromLocalStorage();
+            this.render();
+            this.updateSyncStatus('offline');
+        });
+    }
+
+    updateSyncStatus(status) {
+        const statusEl = document.getElementById('syncStatus');
+        if (!statusEl) return;
+
+        if (status === 'synced') {
+            statusEl.textContent = '✓ Synced';
+            statusEl.className = 'sync-status synced';
+        } else if (status === 'syncing') {
+            statusEl.textContent = '↻ Syncing...';
+            statusEl.className = 'sync-status syncing';
+        } else if (status === 'offline') {
+            statusEl.textContent = '○ Offline';
+            statusEl.className = 'sync-status offline';
+        } else if (this.isOnline) {
+            statusEl.textContent = '✓ Connected';
+            statusEl.className = 'sync-status synced';
+        } else {
+            statusEl.textContent = '○ Offline';
+            statusEl.className = 'sync-status offline';
+        }
+    }
+
+    saveData() {
+        this.saveToLocalStorage();
+        this.saveToFirebase();
+    }
+
+    saveToLocalStorage() {
+        const data = {
+            players: this.players,
+            parValues: this.parValues
+        };
+        localStorage.setItem('fantasyGolf2026', JSON.stringify(data));
+    }
+
+    saveToFirebase() {
+        if (!this.isOnline) return;
+
+        this.updateSyncStatus('syncing');
+        const data = {
+            players: this.players,
+            parValues: this.parValues,
+            lastUpdated: Date.now()
+        };
+
+        database.ref('golfData').set(data)
+            .then(() => {
+                this.updateSyncStatus('synced');
+            })
+            .catch((error) => {
+                console.error('Firebase write error:', error);
+                this.updateSyncStatus('offline');
+            });
+    }
+
+    loadFromLocalStorage() {
         const savedData = localStorage.getItem('fantasyGolf2026');
         if (savedData) {
             const data = JSON.parse(savedData);
@@ -32,14 +143,6 @@ class FantasyGolf {
             ];
             this.saveData();
         }
-    }
-
-    saveData() {
-        const data = {
-            players: this.players,
-            parValues: this.parValues
-        };
-        localStorage.setItem('fantasyGolf2026', JSON.stringify(data));
     }
 
     setupEventListeners() {
@@ -320,7 +423,6 @@ class FantasyGolf {
         if (nextHole < this.holes) {
             this.focusCell(playerIndex, nextHole);
         } else if (playerIndex + 1 < this.players.length) {
-            // Move to first hole of next player
             this.focusCell(playerIndex + 1, 0);
         }
     }
@@ -330,7 +432,6 @@ class FantasyGolf {
         if (prevHole >= 0) {
             this.focusCell(playerIndex, prevHole);
         } else if (playerIndex > 0) {
-            // Move to last hole of previous player
             this.focusCell(playerIndex - 1, this.holes - 1);
         }
     }
@@ -420,7 +521,6 @@ class FantasyGolf {
                 }
             });
 
-            // Extract scores from text
             const scores = this.extractScoresFromText(text);
             this.displayOcrResults(scores);
 
@@ -432,12 +532,8 @@ class FantasyGolf {
     }
 
     extractScoresFromText(text) {
-        // Look for sequences of numbers that could be golf scores (1-15)
-        // This is a simple implementation - you may need to adjust based on actual scorecard format
         const lines = text.split('\n');
         const scores = [];
-
-        // Try to find score patterns
         const scorePattern = /\b([1-9]|1[0-5])\b/g;
 
         for (const line of lines) {
@@ -447,7 +543,6 @@ class FantasyGolf {
             }
         }
 
-        // Take first 18 valid scores found
         return scores.slice(0, 18);
     }
 
@@ -455,13 +550,11 @@ class FantasyGolf {
         document.getElementById('ocrProgress').style.display = 'none';
         document.getElementById('ocrResults').style.display = 'block';
 
-        // Populate player select
         const playerSelect = document.getElementById('ocrPlayerSelect');
         playerSelect.innerHTML = this.players.map((p, i) =>
             `<option value="${i}">${p.name}</option>`
         ).join('');
 
-        // Display extracted scores
         const extractedScoresDiv = document.getElementById('extractedScores');
         if (scores.length === 0) {
             extractedScoresDiv.innerHTML = '<p>No scores detected. Please try a clearer image or enter scores manually.</p>';
@@ -480,7 +573,6 @@ class FantasyGolf {
             extractedScoresDiv.innerHTML = html;
         }
 
-        // Store scores temporarily
         this.tempOcrScores = scores;
     }
 
@@ -497,7 +589,6 @@ class FantasyGolf {
 
             if (newScore >= 1 && newScore <= 15) {
                 const currentScore = player.scores[hole];
-                // Only update if no score exists or new score is better
                 if (currentScore === null || newScore < currentScore) {
                     player.scores[hole] = newScore;
                     updatedCount++;
@@ -514,7 +605,7 @@ class FantasyGolf {
 
     hideOcrModal() {
         document.getElementById('ocrModal').style.display = 'none';
-        document.getElementById('scorecardUpload').value = ''; // Reset file input
+        document.getElementById('scorecardUpload').value = '';
     }
 
     // Export/Import functionality
@@ -549,7 +640,6 @@ class FantasyGolf {
                     throw new Error('Invalid file format');
                 }
 
-                // Validate player data
                 for (const player of data.players) {
                     if (!player.name || !Array.isArray(player.scores) || player.scores.length !== 18) {
                         throw new Error('Invalid player data');
@@ -572,7 +662,7 @@ class FantasyGolf {
         };
 
         reader.readAsText(file);
-        document.getElementById('importUpload').value = ''; // Reset file input
+        document.getElementById('importUpload').value = '';
     }
 }
 
