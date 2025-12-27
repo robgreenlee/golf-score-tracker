@@ -45,8 +45,9 @@ class FantasyGolf {
         // Listen for data changes (real-time sync)
         dataRef.on('value', (snapshot) => {
             const data = snapshot.val();
-            if (data) {
-                this.players = data.players || [];
+            if (data && data.players) {
+                // Convert Firebase data back to proper format
+                this.players = this.convertFromFirebase(data.players);
                 if (data.parValues) {
                     this.parValues = data.parValues;
                 }
@@ -106,12 +107,42 @@ class FantasyGolf {
         localStorage.setItem('fantasyGolf2026', JSON.stringify(data));
     }
 
+    // Convert players array for Firebase storage (null -> -1)
+    convertToFirebase(players) {
+        return players.map(player => ({
+            name: player.name,
+            scores: player.scores.map(score => score === null ? -1 : score)
+        }));
+    }
+
+    // Convert players array from Firebase (−1 -> null, fix sparse arrays)
+    convertFromFirebase(playersData) {
+        // Handle if Firebase returns an object instead of array
+        const playersArray = Array.isArray(playersData) ? playersData : Object.values(playersData);
+
+        return playersArray.map(player => {
+            // Ensure scores is a proper 18-element array
+            let scores = Array(18).fill(null);
+            if (player.scores) {
+                const scoresData = Array.isArray(player.scores) ? player.scores : Object.values(player.scores);
+                for (let i = 0; i < 18; i++) {
+                    const score = scoresData[i];
+                    scores[i] = (score === -1 || score === undefined || score === null) ? null : score;
+                }
+            }
+            return {
+                name: player.name,
+                scores: scores
+            };
+        });
+    }
+
     saveToFirebase() {
         if (!this.isOnline) return;
 
         this.updateSyncStatus('syncing');
         const data = {
-            players: this.players,
+            players: this.convertToFirebase(this.players),
             parValues: this.parValues,
             lastUpdated: Date.now()
         };
