@@ -6,7 +6,7 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    background: linear-gradient(135deg, #2D4F32 0%, #355E3B 100%);
     min-height: 100vh;
     padding: 20px;
 }
@@ -24,19 +24,29 @@ header {
     text-align: center;
     margin-bottom: 30px;
     padding-bottom: 20px;
-    border-bottom: 3px solid #1e3c72;
+    border-bottom: 3px solid #355E3B;
 }
 
 header h1 {
-    color: #1e3c72;
+    color: #355E3B;
     font-size: 2.5em;
     margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
 }
 
 header h2 {
-    color: #2a5298;
+    color: #5A6A70;
     font-size: 1.3em;
     font-weight: normal;
+}
+
+.oak-leaf {
+    width: 48px;
+    height: 48px;
+    fill: #355E3B;
 }
 
 /* Sync Status Indicator */
@@ -91,25 +101,25 @@ header h2 {
 }
 
 .btn-primary {
-    background: #28a745;
+    background: #355E3B;
     color: white;
 }
 
 .btn-primary:hover {
-    background: #218838;
+    background: #2D4F32;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+    box-shadow: 0 4px 12px rgba(53, 94, 59, 0.4);
 }
 
 .btn-secondary {
-    background: #007bff;
+    background: #5A6A70;
     color: white;
 }
 
 .btn-secondary:hover {
-    background: #0056b3;
+    background: #4A5A60;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+    box-shadow: 0 4px 12px rgba(90, 106, 112, 0.4);
 }
 
 .btn-danger {
@@ -193,7 +203,7 @@ header h2 {
 }
 
 .scorecard th {
-    background: #1e3c72;
+    background: #355E3B;
     color: white;
     font-weight: 600;
     text-transform: uppercase;
@@ -204,13 +214,13 @@ header h2 {
 }
 
 .scorecard .hole-header {
-    background: #2a5298;
+    background: #4A7C4E;
 }
 
 .scorecard .player-name {
     background: #f8f9fa;
     font-weight: 600;
-    color: #1e3c72;
+    color: #355E3B;
     text-align: left;
     position: relative;
 }
@@ -261,9 +271,9 @@ header h2 {
 
 .score-input:focus {
     outline: none;
-    border-color: #2a5298;
+    border-color: #355E3B;
     background: white;
-    box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.2);
+    box-shadow: 0 0 0 3px rgba(53, 94, 59, 0.2);
 }
 
 .score-input::placeholder {
@@ -271,10 +281,10 @@ header h2 {
 }
 
 .scorecard .total-cell {
-    background: #ffc107;
+    background: #C9B896;
     font-weight: 700;
     font-size: 1.2em;
-    color: #1e3c72;
+    color: #355E3B;
 }
 
 .scorecard .par-row {
@@ -348,7 +358,7 @@ header h2 {
 }
 
 .modal-content h3 {
-    color: #1e3c72;
+    color: #355E3B;
     margin-bottom: 20px;
 }
 
@@ -367,7 +377,7 @@ header h2 {
 .modal-content input[type="number"]:focus,
 .modal-content select:focus {
     outline: none;
-    border-color: #2a5298;
+    border-color: #355E3B;
 }
 
 .modal-buttons {
@@ -388,7 +398,7 @@ header h2 {
 
 #progressFill {
     height: 100%;
-    background: linear-gradient(90deg, #28a745, #20c997);
+    background: linear-gradient(90deg, #355E3B, #4A7C4E);
     width: 0%;
     transition: width 0.3s ease;
 }
