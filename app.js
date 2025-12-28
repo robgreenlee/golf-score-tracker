@@ -602,7 +602,7 @@ class FantasyGolf {
 
     // Strategy 1: Find 1-9 and 10-18 anchor sequences
     extractByAnchorPattern(numbers) {
-        const scores = [];
+        console.log('Starting anchor pattern extraction with', numbers.length, 'numbers');
 
         // Find front 9 hole numbers: exactly 1,2,3,4,5,6,7,8,9 in sequence
         let front9Anchor = -1;
@@ -615,18 +615,20 @@ class FantasyGolf {
             }
         }
 
-        // Find back 9 hole numbers: exactly 10,11,12,13,14,15,16,17,18 in sequence
+        // Find back 9 hole numbers: look for 10 followed by increasing numbers ending in 18
         let back9Anchor = -1;
         for (let i = 0; i <= numbers.length - 9; i++) {
             const slice = numbers.slice(i, i + 9);
-            if (slice[0] === 10 && slice[8] === 18 &&
-                slice.every((n, idx) => n === idx + 10)) {
+            // More lenient: starts with 10, ends with 18, generally increasing
+            if (slice[0] === 10 && slice[8] === 18) {
                 back9Anchor = i;
                 break;
             }
         }
 
         console.log('Anchors found - Front9:', front9Anchor, 'Back9:', back9Anchor);
+
+        const scores = [];
 
         // GHIN format: after hole numbers (9) comes par row (9 values + total = 10), then scores (9 values)
         // So scores start at anchor + 9 (holes) + 10 (par + total) = anchor + 19
@@ -636,61 +638,76 @@ class FantasyGolf {
             if (scoresStart + 9 <= numbers.length) {
                 const front9Scores = numbers.slice(scoresStart, scoresStart + 9);
                 console.log('Front 9 scores candidate:', front9Scores);
-                // Verify these look like golf scores (mostly 2-10)
                 if (front9Scores.every(s => s >= 1 && s <= 15)) {
                     scores.push(...front9Scores);
                 }
             }
         }
 
-        if (back9Anchor !== -1) {
-            const scoresStart = back9Anchor + 19;
-            if (scoresStart + 9 <= numbers.length) {
-                const back9Scores = numbers.slice(scoresStart, scoresStart + 9);
-                console.log('Back 9 scores candidate:', back9Scores);
-                if (back9Scores.every(s => s >= 1 && s <= 15)) {
-                    scores.push(...back9Scores);
-                }
-            }
-        }
+        // If we have front 9, now find back 9
+        if (scores.length === 9) {
+            console.log('Front 9 found, searching for back 9...');
 
-        // If we found front 9 but not back 9, try to find back 9 scores after front 9
-        if (scores.length === 9 && front9Anchor !== -1) {
-            console.log('Front 9 found, searching for back 9 after it...');
-            // Back 9 section starts after front 9 scores + total
-            // Look for next valid score sequence after position front9Anchor + 30
-            const searchStart = front9Anchor + 30;
+            // Calculate where front 9 section ends
+            // front9Anchor + 9 (holes) + 10 (par+total) + 9 (scores) + 1 (total) = front9Anchor + 29
+            const front9SectionEnd = front9Anchor + 29;
 
-            // Try multiple offsets in case structure varies slightly
-            for (let offset = 19; offset <= 25; offset++) {
-                for (let i = searchStart; i <= numbers.length - 9 - offset; i++) {
-                    const slice = numbers.slice(i, i + 9);
-                    // Check if this looks like back 9 hole numbers (starts with 10)
-                    if (slice[0] === 10) {
-                        const potentialScores = numbers.slice(i + offset, i + offset + 9);
-                        console.log(`Trying back 9 at index ${i} with offset ${offset}:`, potentialScores);
-                        if (potentialScores.length === 9 &&
-                            potentialScores.every(s => s >= 1 && s <= 15)) {
-                            scores.push(...potentialScores);
-                            console.log('Found back 9 scores:', potentialScores);
-                            return scores;
-                        }
+            // Method 1: If we found back 9 anchor, use it
+            if (back9Anchor !== -1 && back9Anchor >= front9SectionEnd) {
+                const scoresStart = back9Anchor + 19;
+                if (scoresStart + 9 <= numbers.length) {
+                    const back9Scores = numbers.slice(scoresStart, scoresStart + 9);
+                    console.log('Back 9 scores via anchor:', back9Scores);
+                    if (back9Scores.every(s => s >= 1 && s <= 15)) {
+                        scores.push(...back9Scores);
+                        return scores;
                     }
                 }
             }
 
-            // Alternative: Just find next 9 valid scores after front 9 total
-            const front9End = front9Anchor + 29; // holes(9) + par(10) + scores(9) + total(1)
-            for (let i = front9End; i <= numbers.length - 9; i++) {
-                const candidate = numbers.slice(i, i + 9);
-                // Skip if this looks like hole numbers or par
-                if (candidate[0] >= 10 && candidate[0] <= 18) continue; // hole numbers
-                if (candidate.every(n => n >= 3 && n <= 5)) continue; // par values
+            // Method 2: Scan for back 9 structure starting after front 9
+            // Look for a "10" that starts the back 9 hole numbers
+            for (let i = front9SectionEnd; i <= numbers.length - 28; i++) {
+                if (numbers[i] === 10) {
+                    // This might be the start of back 9 holes
+                    // Skip 9 hole numbers + 10 par values = 19, then get 9 scores
+                    const potentialScores = numbers.slice(i + 19, i + 28);
+                    console.log(`Checking back 9 at position ${i}:`, potentialScores);
 
+                    if (potentialScores.length === 9 &&
+                        potentialScores.every(s => s >= 1 && s <= 15) &&
+                        !potentialScores.every(s => s >= 3 && s <= 5)) { // Not all par values
+                        console.log('Found back 9 scores:', potentialScores);
+                        scores.push(...potentialScores);
+                        return scores;
+                    }
+                }
+            }
+
+            // Method 3: Find any valid 9-score sequence after front 9
+            console.log('Trying fallback scan from position', front9SectionEnd);
+            for (let i = front9SectionEnd; i <= numbers.length - 9; i++) {
+                const candidate = numbers.slice(i, i + 9);
+
+                // Skip hole number sequences (10-18)
+                if (candidate[0] >= 10 && candidate[0] <= 18 &&
+                    candidate.some(n => n >= 10 && n <= 18)) continue;
+
+                // Skip pure par sequences (all 3-5)
+                if (candidate.every(n => n >= 3 && n <= 5)) continue;
+
+                // Skip if contains totals (numbers > 20)
+                if (candidate.some(n => n > 15)) continue;
+
+                // Valid score sequence
                 if (candidate.every(s => s >= 1 && s <= 15)) {
-                    console.log('Found back 9 by scanning:', candidate);
-                    scores.push(...candidate);
-                    break;
+                    const total = candidate.reduce((a, b) => a + b, 0);
+                    // Reasonable 9-hole score total (27-63 for bogey to triple bogey average)
+                    if (total >= 27 && total <= 70) {
+                        console.log('Found back 9 via fallback scan:', candidate, 'total:', total);
+                        scores.push(...candidate);
+                        return scores;
+                    }
                 }
             }
         }
