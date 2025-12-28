@@ -391,9 +391,18 @@ class FantasyGolf {
                 e.target.select();
             });
 
-            // Only allow numbers
+            // Handle input - auto-advance after single digit
             input.addEventListener('input', (e) => {
-                e.target.value = e.target.value.replace(/[^0-9]/g, '');
+                const value = e.target.value.replace(/[^0-9]/g, '');
+                e.target.value = value;
+
+                // Auto-advance after entering a single digit (1-9)
+                if (value.length === 1 && value >= '1' && value <= '9') {
+                    const playerIndex = parseInt(e.target.dataset.player);
+                    const hole = parseInt(e.target.dataset.hole);
+                    this.saveInlineScore(e.target);
+                    this.moveToNextCell(playerIndex, hole);
+                }
             });
         });
     }
