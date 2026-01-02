@@ -22,6 +22,7 @@ class FantasyGolf {
         this.parValues = [4, 4, 4, 4, 3, 4, 3, 4, 5, 3, 4, 4, 5, 5, 3, 4, 3, 5]; // Moraga CC (Par 72)
         this.isOnline = false;
         this.isSyncing = false;
+        this.pendingFocus = null; // Track where to restore focus after render
 
         this.init();
     }
@@ -346,6 +347,12 @@ class FantasyGolf {
                 this.removePlayer(playerIndex);
             });
         });
+
+        // Restore focus if there's a pending focus position (e.g., after deleting a score)
+        if (this.pendingFocus) {
+            this.focusCell(this.pendingFocus.playerIndex, this.pendingFocus.hole);
+            this.pendingFocus = null;
+        }
     }
 
     setupScoreInputListeners() {
@@ -438,6 +445,12 @@ class FantasyGolf {
         if (newValue === '') {
             if (currentScore !== null) {
                 player.scores[hole] = null;
+                // Set pending focus to previous hole before save triggers re-render
+                if (hole > 0) {
+                    this.pendingFocus = { playerIndex, hole: hole - 1 };
+                } else if (playerIndex > 0) {
+                    this.pendingFocus = { playerIndex: playerIndex - 1, hole: this.holes - 1 };
+                }
                 this.saveData();
                 this.updateTotal(playerIndex);
             }
