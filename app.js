@@ -35,7 +35,6 @@ class FantasyGolf {
     // Firebase Setup and Sync
     setupFirebase() {
         const dataRef = database.ref('golfData');
-        const statusEl = document.getElementById('syncStatus');
 
         // Listen for connection state
         database.ref('.info/connected').on('value', (snapshot) => {
@@ -367,21 +366,15 @@ class FantasyGolf {
                 const playerIndex = parseInt(e.target.dataset.player);
                 const hole = parseInt(e.target.dataset.hole);
 
-                // Handle backspace - if empty, go to previous cell and clear it
+                // Handle backspace - if empty, go to previous cell (don't auto-clear it)
                 if (e.key === 'Backspace' && e.target.value === '') {
                     e.preventDefault();
                     if (hole > 0 || playerIndex > 0) {
-                        // Move to previous cell
+                        // Move to previous cell without clearing it
                         if (hole > 0) {
                             this.focusCell(playerIndex, hole - 1);
                         } else if (playerIndex > 0) {
                             this.focusCell(playerIndex - 1, this.holes - 1);
-                        }
-                        // Clear the previous cell's score
-                        const prevInput = document.activeElement;
-                        if (prevInput && prevInput.classList.contains('score-input')) {
-                            prevInput.value = '';
-                            this.saveInlineScore(prevInput);
                         }
                     }
                     return;
@@ -845,8 +838,6 @@ class FantasyGolf {
             }
             extractedScoresDiv.innerHTML = html;
         }
-
-        this.tempOcrScores = scores;
     }
 
     applyOcrScores() {
