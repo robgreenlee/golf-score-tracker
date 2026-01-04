@@ -413,7 +413,13 @@ class FantasyGolf {
 
             // Handle input - auto-advance after single digit
             input.addEventListener('input', (e) => {
-                const value = e.target.value.replace(/[^0-9]/g, '');
+                let value = e.target.value.replace(/[^0-9]/g, '');
+
+                // If multiple digits entered (e.g., typing over existing value),
+                // keep only the last digit typed for smooth overwrite behavior
+                if (value.length > 1) {
+                    value = value.slice(-1);
+                }
                 e.target.value = value;
 
                 // Auto-advance after entering a single digit (1-9)
