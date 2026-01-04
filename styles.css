@@ -294,6 +294,50 @@ header h2 {
     font-weight: 600;
 }
 
+/* Subtotal columns (F9, B9) */
+.subtotal-header {
+    background: #2D4F32 !important;
+    font-weight: 700;
+}
+
+.subtotal-cell {
+    background: #e8f5e9;
+    font-weight: 600;
+    border-left: 2px solid #355E3B;
+    border-right: 2px solid #355E3B;
+}
+
+/* Score visual indicators - par relationship */
+/* Birdie (1 under par) - circle */
+.score-cell.birdie .score-input {
+    border: 2px solid #2196F3;
+    border-radius: 50%;
+    background: rgba(33, 150, 243, 0.1);
+}
+
+/* Eagle (2+ under par) - double circle */
+.score-cell.eagle .score-input {
+    border: 2px solid #FFD700;
+    border-radius: 50%;
+    background: rgba(255, 215, 0, 0.15);
+    box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.3);
+}
+
+/* Bogey (1 over par) - square */
+.score-cell.bogey .score-input {
+    border: 2px solid #666;
+    border-radius: 2px;
+    background: rgba(102, 102, 102, 0.08);
+}
+
+/* Double bogey+ (2+ over par) - double square */
+.score-cell.double-bogey .score-input {
+    border: 2px solid #333;
+    border-radius: 2px;
+    background: rgba(51, 51, 51, 0.1);
+    box-shadow: 0 0 0 3px rgba(51, 51, 51, 0.2);
+}
+
 /* Modal Styles */
 .modal {
     display: none;

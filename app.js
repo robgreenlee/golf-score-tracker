@@ -281,22 +281,35 @@ class FantasyGolf {
 
         let html = '<table class="scorecard">';
 
-        // Header row - Hole numbers
+        // Header row - Hole numbers with F9/B9/Total
         html += '<tr>';
         html += '<th>Player</th>';
-        for (let i = 1; i <= this.holes; i++) {
+        for (let i = 1; i <= 9; i++) {
             html += `<th class="hole-header">${i}</th>`;
         }
+        html += '<th class="subtotal-header">F9</th>';
+        for (let i = 10; i <= 18; i++) {
+            html += `<th class="hole-header">${i}</th>`;
+        }
+        html += '<th class="subtotal-header">B9</th>';
         html += '<th>Total</th>';
         html += '</tr>';
 
-        // Par row
+        // Par row with F9/B9 subtotals
         html += '<tr class="par-row">';
         html += '<td><strong>Par</strong></td>';
-        for (let i = 0; i < this.holes; i++) {
+        let frontPar = 0, backPar = 0;
+        for (let i = 0; i < 9; i++) {
             html += `<td>${this.parValues[i]}</td>`;
+            frontPar += this.parValues[i];
         }
-        const totalPar = this.parValues.reduce((sum, par) => sum + par, 0);
+        html += `<td class="subtotal-cell">${frontPar}</td>`;
+        for (let i = 9; i < 18; i++) {
+            html += `<td>${this.parValues[i]}</td>`;
+            backPar += this.parValues[i];
+        }
+        html += `<td class="subtotal-cell">${backPar}</td>`;
+        const totalPar = frontPar + backPar;
         html += `<td><strong>${totalPar}</strong></td>`;
         html += '</tr>';
 
@@ -309,10 +322,15 @@ class FantasyGolf {
                 <button class="remove-player" data-player="${playerIndex}">✕</button>
             </td>`;
 
-            for (let hole = 0; hole < this.holes; hole++) {
+            let front9Total = 0, front9Count = 0;
+            let back9Total = 0, back9Count = 0;
+
+            // Front 9 holes
+            for (let hole = 0; hole < 9; hole++) {
                 const score = player.scores[hole];
                 const displayScore = score !== null ? score : '';
-                html += `<td class="score-cell" data-player="${playerIndex}" data-hole="${hole}">
+                const parClass = this.getParClass(score, this.parValues[hole]);
+                html += `<td class="score-cell ${parClass}" data-player="${playerIndex}" data-hole="${hole}">
                     <input type="text"
                            class="score-input"
                            data-player="${playerIndex}"
@@ -324,7 +342,40 @@ class FantasyGolf {
                            pattern="[0-9]*">
                 </td>`;
                 tabIndex++;
+                if (score !== null) {
+                    front9Total += score;
+                    front9Count++;
+                }
             }
+
+            // Front 9 subtotal
+            html += `<td class="subtotal-cell">${front9Count > 0 ? front9Total : '—'}</td>`;
+
+            // Back 9 holes
+            for (let hole = 9; hole < 18; hole++) {
+                const score = player.scores[hole];
+                const displayScore = score !== null ? score : '';
+                const parClass = this.getParClass(score, this.parValues[hole]);
+                html += `<td class="score-cell ${parClass}" data-player="${playerIndex}" data-hole="${hole}">
+                    <input type="text"
+                           class="score-input"
+                           data-player="${playerIndex}"
+                           data-hole="${hole}"
+                           value="${displayScore}"
+                           tabindex="${tabIndex}"
+                           maxlength="2"
+                           inputmode="numeric"
+                           pattern="[0-9]*">
+                </td>`;
+                tabIndex++;
+                if (score !== null) {
+                    back9Total += score;
+                    back9Count++;
+                }
+            }
+
+            // Back 9 subtotal
+            html += `<td class="subtotal-cell">${back9Count > 0 ? back9Total : '—'}</td>`;
 
             // Calculate total
             const total = this.calculateTotal(player);
@@ -531,6 +582,19 @@ class FantasyGolf {
         const validScores = player.scores.filter(score => score !== null);
         if (validScores.length === 0) return null;
         return validScores.reduce((sum, score) => sum + score, 0);
+    }
+
+    // Returns CSS class for score relative to par
+    // birdie (1 under) = circle, bogey (1 over) = square, double+ = double shapes
+    getParClass(score, par) {
+        if (score === null || par === null) return '';
+        const diff = score - par;
+        if (diff === 0) return ''; // par - no decoration
+        if (diff === -1) return 'birdie'; // 1 under par - circle
+        if (diff <= -2) return 'eagle'; // 2+ under par - double circle
+        if (diff === 1) return 'bogey'; // 1 over par - square
+        if (diff >= 2) return 'double-bogey'; // 2+ over par - double square
+        return '';
     }
 
     showPlayerModal() {
