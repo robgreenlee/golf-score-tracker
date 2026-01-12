@@ -13,47 +13,93 @@
 <img class="oak-leaf" src="moraga_oak_leaf.jpg" alt="Moraga Country Club Oak Leaf">
                 Fantasy Golf 2026
             </h1>
-            <h2>Moraga Country Club - Best Scores</h2>
+            <h2>Moraga Country Club</h2>
             <div id="syncStatus" class="sync-status">Connecting...</div>
         </header>
 
-        <div class="controls">
-            <button id="addPlayerBtn" class="btn btn-primary">+ Add Player</button>
-            <button id="uploadScorecardBtn" class="btn btn-secondary">📷 Upload Scorecard</button>
-            <input type="file" id="scorecardUpload" accept="image/*" style="display: none;">
-            <div class="dropdown">
-                <button id="toolsBtn" class="btn btn-secondary">⚙️ Tools</button>
-                <div class="dropdown-content" id="toolsMenu">
-                    <button id="exportBtn">📤 Export Scores</button>
-                    <button id="importBtn">📥 Import Scores</button>
-                    <hr>
-                    <button id="resetBtn" class="danger">🗑️ Reset All Scores</button>
+        <!-- Tab Navigation -->
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="enterRound">Enter Round</button>
+            <button class="tab-btn" data-tab="fantasyScores">Fantasy Scores</button>
+            <button class="tab-btn" data-tab="history">Round History</button>
+        </nav>
+
+        <!-- Enter Round Tab Content -->
+        <div id="enterRoundTab" class="tab-content active">
+            <div class="controls">
+                <div class="round-entry-header">
+                    <div class="field-group">
+                        <label for="entryPlayer">Player:</label>
+                        <select id="entryPlayer"></select>
+                    </div>
+                    <div class="field-group">
+                        <label for="entryDate">Date:</label>
+                        <input type="date" id="entryDate">
+                    </div>
+                    <button id="uploadScorecardBtn" class="btn btn-secondary">📷 Upload Scorecard</button>
+                    <input type="file" id="scorecardUpload" accept="image/*" style="display: none;">
+                    <button id="clearRoundBtn" class="btn btn-secondary">Clear</button>
                 </div>
             </div>
-            <input type="file" id="importUpload" accept=".json" style="display: none;">
+
+            <div id="roundEntryContainer">
+                <!-- Round entry scorecard will be generated here -->
+            </div>
+
+            <div class="submit-section">
+                <button id="submitRoundBtn" class="btn btn-success btn-large">✓ Submit Round</button>
+                <p class="submit-hint">Enter all 18 holes to submit your round</p>
+            </div>
         </div>
 
-        <div id="scorecardContainer">
-            <!-- Scorecard will be dynamically generated here -->
+        <!-- Fantasy Scores Tab Content -->
+        <div id="fantasyScoresTab" class="tab-content">
+            <div class="controls">
+                <button id="addPlayerBtn" class="btn btn-primary">+ Add Player</button>
+                <div class="dropdown">
+                    <button id="toolsBtn" class="btn btn-secondary">⚙️ Tools</button>
+                    <div class="dropdown-content" id="toolsMenu">
+                        <button id="exportBtn">📤 Export Data</button>
+                        <button id="importBtn">📥 Import Data</button>
+                        <hr>
+                        <button id="resetBtn" class="danger">🗑️ Reset All Data</button>
+                    </div>
+                </div>
+                <input type="file" id="importUpload" accept=".json" style="display: none;">
+            </div>
+
+            <div id="fantasyScorecardContainer">
+                <!-- Fantasy scorecard (best scores) will be generated here -->
+            </div>
+
+            <!-- Fantasy Scoring Summary -->
+            <div id="fantasyScoringSection" class="fantasy-section">
+                <h3>Fantasy Scoring Summary</h3>
+                <div id="fantasyScores" class="fantasy-scores">
+                    <!-- Will be populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- History Tab Content -->
+        <div id="historyTab" class="tab-content">
+            <div class="history-header">
+                <h3>Round History</h3>
+                <div class="history-filters">
+                    <label for="historyPlayerFilter">Filter by Player:</label>
+                    <select id="historyPlayerFilter">
+                        <option value="all">All Players</option>
+                    </select>
+                </div>
+            </div>
+            <div id="roundsList" class="rounds-list">
+                <!-- Rounds will be populated dynamically -->
+            </div>
         </div>
 
         <footer>
             <p>Track your best score on each hole throughout 2026!</p>
         </footer>
-    </div>
-
-    <!-- Modal for editing score -->
-    <div id="scoreModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h3>Update Score</h3>
-            <p id="modalInfo"></p>
-            <input type="number" id="scoreInput" min="1" max="15" placeholder="Enter score">
-            <div class="modal-buttons">
-                <button id="saveScoreBtn" class="btn btn-primary">Save</button>
-                <button id="cancelScoreBtn" class="btn btn-secondary">Cancel</button>
-            </div>
-        </div>
     </div>
 
     <!-- Modal for adding player -->
@@ -81,13 +127,38 @@
                 </div>
             </div>
             <div id="ocrResults" style="display: none;">
-                <h4>Select Player and Scores:</h4>
-                <select id="ocrPlayerSelect"></select>
+                <h4>Extracted Scores:</h4>
                 <div id="extractedScores"></div>
                 <div class="modal-buttons">
                     <button id="applyOcrBtn" class="btn btn-primary">Apply Scores</button>
                     <button id="cancelOcrBtn" class="btn btn-secondary">Cancel</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Round Submission Modal -->
+    <div id="roundModal" class="modal">
+        <div class="modal-content modal-large">
+            <span class="close">&times;</span>
+            <h3>Confirm Round Submission</h3>
+            <div id="roundSummary" class="round-summary">
+                <!-- Round summary will be populated dynamically -->
+            </div>
+            <div id="kickersSection" class="kickers-section">
+                <h4>Kickers Earned <span class="kicker-limit">(Max 2 per year)</span></h4>
+                <p class="kicker-status" id="kickerStatusText"></p>
+                <div id="detectedKickers" class="kicker-list">
+                    <!-- Detected kickers with checkboxes -->
+                </div>
+                <div id="manualKickers" class="kicker-list manual">
+                    <h5>Manual Kickers</h5>
+                    <!-- Manual kickers (Full Wedge) -->
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button id="confirmRoundBtn" class="btn btn-primary">Confirm & Save Round</button>
+                <button id="cancelRoundBtn" class="btn btn-secondary">Cancel</button>
             </div>
         </div>
     </div>
