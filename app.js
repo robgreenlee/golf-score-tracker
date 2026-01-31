@@ -1,5 +1,4 @@
 // Fantasy Golf 2026 - Main Application with Firebase Sync
-// RESTRUCTURED: Primary flow is Enter Round → Submit → Updates Fantasy Scores
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -23,41 +22,7 @@ class FantasyGolf {
         this.parValues = [4, 4, 4, 4, 3, 4, 3, 4, 5, 3, 4, 4, 5, 5, 3, 4, 3, 5]; // Moraga CC (Par 72)
         this.isOnline = false;
         this.isSyncing = false;
-        this.currentTab = 'enterRound';
-
-        // Current round being entered (temporary, not saved until submission)
-        this.currentRoundScores = Array(18).fill(null);
-
-        // Player-specific configuration for handicap (pops) and personal bests
-        this.playerConfig = {
-            'Rob': {
-                personalBest: 83,
-                pops: {
-                    general: [2, 11],           // 0-indexed: holes 3 and 12
-                    noDoubleBogey: [0, 2, 11]   // 0-indexed: holes 1, 3, and 12
-                }
-            },
-            'Waitzman': {
-                personalBest: 77,
-                pops: { general: [], noDoubleBogey: [] }
-            },
-            'Drew': {
-                personalBest: 75,
-                pops: { general: [], noDoubleBogey: [] }
-            }
-        };
-
-        // Kicker definitions (max 2 per player per year, each -1 stroke)
-        this.kickerTypes = {
-            beatPersonalBest: { name: 'Beat Personal Best', value: -1, autoDetect: true },
-            holeInOne: { name: 'Hole-in-One', value: -1, autoDetect: true },
-            albatross: { name: 'Albatross', value: -1, autoDetect: true },
-            fullWedge: { name: 'Full Wedge (100+ yd)', value: -1, autoDetect: false },
-            noDoubleBogeys: { name: 'No Double Bogeys', value: -1, autoDetect: true }
-        };
-
-        // Track editing state
-        this.editingRound = null;
+        this.pendingFocus = null; // Track where to restore focus after render
 
         this.init();
     }
@@ -65,15 +30,6 @@ class FantasyGolf {
     init() {
         this.setupFirebase();
         this.setupEventListeners();
-        this.setupTabNavigation();
-        this.setDefaultDate();
-    }
-
-    setDefaultDate() {
-        const dateInput = document.getElementById('entryDate');
-        if (dateInput) {
-            dateInput.value = new Date().toISOString().split('T')[0];
-        }
     }
 
     // Firebase Setup and Sync
@@ -90,16 +46,20 @@ class FantasyGolf {
         dataRef.on('value', (snapshot) => {
             const data = snapshot.val();
             if (data && data.players) {
+                // Convert Firebase data back to proper format
                 this.players = this.convertFromFirebase(data.players);
                 if (data.parValues) {
                     this.parValues = data.parValues;
                 }
+                // Also save to localStorage as backup
                 this.saveToLocalStorage();
-                this.renderAll();
+                this.render();
                 this.updateSyncStatus('synced');
             } else {
+                // No data in Firebase, load from localStorage or use defaults
                 this.loadFromLocalStorage();
-                this.renderAll();
+                this.render();
+                // Push initial data to Firebase
                 if (this.players.length > 0) {
                     this.saveToFirebase();
                 }
@@ -107,7 +67,7 @@ class FantasyGolf {
         }, (error) => {
             console.error('Firebase read error:', error);
             this.loadFromLocalStorage();
-            this.renderAll();
+            this.render();
             this.updateSyncStatus('offline');
         });
     }
@@ -147,25 +107,21 @@ class FantasyGolf {
         localStorage.setItem('fantasyGolf2026', JSON.stringify(data));
     }
 
+    // Convert players array for Firebase storage (null -> -1)
     convertToFirebase(players) {
         return players.map(player => ({
             name: player.name,
-            scores: player.scores.map(score => score === null ? -1 : score),
-            rounds: (player.rounds || []).map(round => ({
-                id: round.id,
-                date: round.date,
-                scores: round.scores.map(s => s === null ? -1 : s),
-                kickers: round.kickers || { detected: [], confirmed: [] }
-            })),
-            kickersUsed: player.kickersUsed || 0,
-            confirmedKickers: player.confirmedKickers || []
+            scores: player.scores.map(score => score === null ? -1 : score)
         }));
     }
 
+    // Convert players array from Firebase (−1 -> null, fix sparse arrays)
     convertFromFirebase(playersData) {
+        // Handle if Firebase returns an object instead of array
         const playersArray = Array.isArray(playersData) ? playersData : Object.values(playersData);
 
         return playersArray.map(player => {
+            // Ensure scores is a proper 18-element array
             let scores = Array(18).fill(null);
             if (player.scores) {
                 const scoresData = Array.isArray(player.scores) ? player.scores : Object.values(player.scores);
@@ -174,24 +130,9 @@ class FantasyGolf {
                     scores[i] = (score === -1 || score === undefined || score === null) ? null : score;
                 }
             }
-
-            let rounds = [];
-            if (player.rounds) {
-                const roundsData = Array.isArray(player.rounds) ? player.rounds : Object.values(player.rounds);
-                rounds = roundsData.filter(r => r).map(round => ({
-                    id: round.id,
-                    date: round.date,
-                    scores: (round.scores || []).map(s => (s === -1 || s === undefined || s === null) ? null : s),
-                    kickers: round.kickers || { detected: [], confirmed: [] }
-                }));
-            }
-
             return {
                 name: player.name,
-                scores: scores,
-                rounds: rounds,
-                kickersUsed: player.kickersUsed || 0,
-                confirmedKickers: player.confirmedKickers || []
+                scores: scores
             };
         });
     }
@@ -220,31 +161,19 @@ class FantasyGolf {
         const savedData = localStorage.getItem('fantasyGolf2026');
         if (savedData) {
             const data = JSON.parse(savedData);
-            this.players = (data.players || []).map(p => this.migratePlayerData(p));
+            this.players = data.players || [];
             if (data.parValues) {
                 this.parValues = data.parValues;
             }
         } else {
+            // Initialize with default players
             this.players = [
-                { name: 'Rob', scores: Array(18).fill(null), rounds: [], kickersUsed: 0, confirmedKickers: [] },
-                { name: 'Drew', scores: Array(18).fill(null), rounds: [], kickersUsed: 0, confirmedKickers: [] },
-                { name: 'Waitzman', scores: Array(18).fill(null), rounds: [], kickersUsed: 0, confirmedKickers: [] }
+                { name: 'Rob', scores: Array(18).fill(null) },
+                { name: 'Drew', scores: Array(18).fill(null) },
+                { name: 'Mike', scores: Array(18).fill(null) }
             ];
             this.saveData();
         }
-    }
-
-    migratePlayerData(player) {
-        if (player.rounds !== undefined && player.kickersUsed !== undefined) {
-            return player;
-        }
-        return {
-            name: player.name,
-            scores: player.scores || Array(18).fill(null),
-            rounds: player.rounds || [],
-            kickersUsed: player.kickersUsed || 0,
-            confirmedKickers: player.confirmedKickers || []
-        };
     }
 
     setupEventListeners() {
@@ -264,22 +193,13 @@ class FantasyGolf {
             }
         });
 
-        // Clear Round Button
-        document.getElementById('clearRoundBtn').addEventListener('click', () => {
-            this.clearCurrentRound();
-        });
-
-        // Submit Round Button
-        document.getElementById('submitRoundBtn').addEventListener('click', () => {
-            this.showRoundSubmissionModal();
-        });
-
         // Tools Dropdown
         document.getElementById('toolsBtn').addEventListener('click', (e) => {
             e.stopPropagation();
             document.getElementById('toolsMenu').classList.toggle('show');
         });
 
+        // Close dropdown when clicking outside
         document.addEventListener('click', () => {
             document.getElementById('toolsMenu').classList.remove('show');
         });
@@ -302,15 +222,12 @@ class FantasyGolf {
 
         // Reset Button
         document.getElementById('resetBtn').addEventListener('click', () => {
-            if (confirm('Are you sure you want to reset ALL data? This will delete all players, rounds, and scores. This cannot be undone.')) {
+            if (confirm('Are you sure you want to reset ALL scores? This cannot be undone.')) {
                 this.players.forEach(player => {
                     player.scores = Array(18).fill(null);
-                    player.rounds = [];
-                    player.kickersUsed = 0;
-                    player.confirmedKickers = [];
                 });
                 this.saveData();
-                this.renderAll();
+                this.render();
             }
         });
 
@@ -330,15 +247,6 @@ class FantasyGolf {
 
         document.getElementById('cancelOcrBtn').addEventListener('click', () => {
             this.hideOcrModal();
-        });
-
-        // Round Modal
-        document.getElementById('confirmRoundBtn').addEventListener('click', () => {
-            this.confirmRoundSubmission();
-        });
-
-        document.getElementById('cancelRoundBtn').addEventListener('click', () => {
-            this.hideRoundModal();
         });
 
         // Close buttons for all modals
@@ -361,272 +269,208 @@ class FantasyGolf {
                 this.addPlayer();
             }
         });
-
-        // Player selection change updates the round entry display
-        document.getElementById('entryPlayer').addEventListener('change', () => {
-            this.renderRoundEntry();
-        });
     }
 
-    setupTabNavigation() {
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const tab = e.target.dataset.tab;
-                this.switchTab(tab);
-            });
-        });
-
-        // History player filter
-        document.getElementById('historyPlayerFilter').addEventListener('change', () => {
-            this.renderHistory();
-        });
-    }
-
-    switchTab(tabName) {
-        // Update button states
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.tab === tabName);
-        });
-
-        // Show/hide content
-        document.getElementById('enterRoundTab').classList.toggle('active', tabName === 'enterRound');
-        document.getElementById('fantasyScoresTab').classList.toggle('active', tabName === 'fantasyScores');
-        document.getElementById('historyTab').classList.toggle('active', tabName === 'history');
-
-        this.currentTab = tabName;
-
-        // Render appropriate content
-        if (tabName === 'enterRound') {
-            this.renderRoundEntry();
-        } else if (tabName === 'fantasyScores') {
-            this.renderFantasyScorecard();
-            this.renderFantasyScoring();
-        } else if (tabName === 'history') {
-            this.populateHistoryPlayerFilter();
-            this.renderHistory();
-        }
-    }
-
-    // ============================================
-    // RENDER ALL
-    // ============================================
-    renderAll() {
-        this.populatePlayerDropdowns();
-
-        if (this.currentTab === 'enterRound') {
-            this.renderRoundEntry();
-        } else if (this.currentTab === 'fantasyScores') {
-            this.renderFantasyScorecard();
-            this.renderFantasyScoring();
-        } else if (this.currentTab === 'history') {
-            this.populateHistoryPlayerFilter();
-            this.renderHistory();
-        }
-    }
-
-    populatePlayerDropdowns() {
-        const entrySelect = document.getElementById('entryPlayer');
-        if (entrySelect) {
-            const currentValue = entrySelect.value;
-            entrySelect.innerHTML = this.players.map((p, i) =>
-                `<option value="${i}">${p.name}</option>`
-            ).join('');
-
-            // Restore selection if valid
-            if (currentValue && parseInt(currentValue) < this.players.length) {
-                entrySelect.value = currentValue;
-            }
-        }
-    }
-
-    // ============================================
-    // TAB 1: ENTER ROUND
-    // ============================================
-    renderRoundEntry() {
-        const container = document.getElementById('roundEntryContainer');
+    render() {
+        const container = document.getElementById('scorecardContainer');
 
         if (this.players.length === 0) {
-            container.innerHTML = '<p class="no-data">No players yet. Go to Fantasy Scores tab to add players.</p>';
+            container.innerHTML = '<p style="text-align: center; padding: 40px; color: #666;">No players yet. Add some players to get started!</p>';
             return;
         }
 
-        const playerIndex = parseInt(document.getElementById('entryPlayer').value) || 0;
-        const player = this.players[playerIndex];
-        if (!player) return;
-
-        let html = '<table class="scorecard round-entry">';
-
-        // Header row
-        html += '<tr>';
-        html += '<th>Hole</th>';
-        for (let i = 1; i <= 9; i++) {
-            const isPopHole = this.isPopHole(player.name, i - 1);
-            html += `<th class="hole-header ${isPopHole ? 'pop-header' : ''}">${i}${isPopHole ? '*' : ''}</th>`;
-        }
-        html += '<th class="subtotal-header">F9</th>';
-        for (let i = 10; i <= 18; i++) {
-            const isPopHole = this.isPopHole(player.name, i - 1);
-            html += `<th class="hole-header ${isPopHole ? 'pop-header' : ''}">${i}${isPopHole ? '*' : ''}</th>`;
-        }
-        html += '<th class="subtotal-header">B9</th>';
-        html += '<th class="gross-header">Total</th>';
-        html += '</tr>';
-
-        // Par row
-        html += '<tr class="par-row">';
-        html += '<td><strong>Par</strong></td>';
+        // Calculate par totals
         let frontPar = 0, backPar = 0;
-        for (let i = 0; i < 9; i++) {
-            html += `<td>${this.parValues[i]}</td>`;
-            frontPar += this.parValues[i];
-        }
-        html += `<td class="subtotal-cell">${frontPar}</td>`;
-        for (let i = 9; i < 18; i++) {
-            html += `<td>${this.parValues[i]}</td>`;
-            backPar += this.parValues[i];
-        }
-        html += `<td class="subtotal-cell">${backPar}</td>`;
-        html += `<td><strong>${frontPar + backPar}</strong></td>`;
-        html += '</tr>';
+        for (let i = 0; i < 9; i++) frontPar += this.parValues[i];
+        for (let i = 9; i < 18; i++) backPar += this.parValues[i];
+        const totalPar = frontPar + backPar;
 
-        // Score entry row
-        html += '<tr class="entry-row">';
-        html += `<td class="player-name">${player.name}</td>`;
+        // Build desktop layout (single wide table)
+        let desktopHtml = '<div class="desktop-scorecard"><table class="scorecard">';
+        desktopHtml += '<tr><th>Player</th>';
+        for (let i = 1; i <= 9; i++) desktopHtml += `<th class="hole-header">${i}</th>`;
+        desktopHtml += '<th class="subtotal-header">F9</th>';
+        for (let i = 10; i <= 18; i++) desktopHtml += `<th class="hole-header">${i}</th>`;
+        desktopHtml += '<th class="subtotal-header">B9</th><th>Total</th></tr>';
 
-        let front9Total = 0, front9Count = 0;
-        let back9Total = 0, back9Count = 0;
+        desktopHtml += '<tr class="par-row"><td><strong>Par</strong></td>';
+        for (let i = 0; i < 9; i++) desktopHtml += `<td>${this.parValues[i]}</td>`;
+        desktopHtml += `<td class="subtotal-cell">${frontPar}</td>`;
+        for (let i = 9; i < 18; i++) desktopHtml += `<td>${this.parValues[i]}</td>`;
+        desktopHtml += `<td class="subtotal-cell">${backPar}</td>`;
+        desktopHtml += `<td><strong>${totalPar}</strong></td></tr>`;
+
+        // Build mobile layout (two stacked tables)
+        let mobileHtml = '<div class="mobile-scorecard">';
+
+        // Mobile Front 9 table
+        mobileHtml += '<table class="scorecard scorecard-front">';
+        mobileHtml += '<tr><th>Player</th>';
+        for (let i = 1; i <= 9; i++) mobileHtml += `<th class="hole-header">${i}</th>`;
+        mobileHtml += '<th class="subtotal-header">F9</th></tr>';
+
+        mobileHtml += '<tr class="par-row"><td><strong>Par</strong></td>';
+        for (let i = 0; i < 9; i++) mobileHtml += `<td>${this.parValues[i]}</td>`;
+        mobileHtml += `<td class="subtotal-cell">${frontPar}</td></tr>`;
+
+        // Mobile Back 9 table
+        let mobileBack9Html = '<table class="scorecard scorecard-back">';
+        mobileBack9Html += '<tr><th>Player</th>';
+        for (let i = 10; i <= 18; i++) mobileBack9Html += `<th class="hole-header">${i}</th>`;
+        mobileBack9Html += '<th class="subtotal-header">B9</th><th>Total</th></tr>';
+
+        mobileBack9Html += '<tr class="par-row"><td><strong>Par</strong></td>';
+        for (let i = 9; i < 18; i++) mobileBack9Html += `<td>${this.parValues[i]}</td>`;
+        mobileBack9Html += `<td class="subtotal-cell">${backPar}</td>`;
+        mobileBack9Html += `<td><strong>${totalPar}</strong></td></tr>`;
+
+        // Player rows for all layouts
         let tabIndex = 1;
+        this.players.forEach((player, playerIndex) => {
+            let front9Total = 0, front9Count = 0;
+            let back9Total = 0, back9Count = 0;
 
-        // Front 9
-        for (let hole = 0; hole < 9; hole++) {
-            const score = this.currentRoundScores[hole];
-            const isPopHole = this.isPopHole(player.name, hole);
-            const parClass = this.getParClass(score, this.parValues[hole], player.name, hole);
-            const popClass = isPopHole ? 'pop-hole' : '';
-
-            html += `<td class="score-cell ${parClass} ${popClass}">
-                <input type="text"
-                       class="score-input"
-                       data-hole="${hole}"
-                       value="${score !== null ? score : ''}"
-                       tabindex="${tabIndex}"
-                       maxlength="2"
-                       inputmode="numeric"
-                       pattern="[0-9]*">
-            </td>`;
-            tabIndex++;
-
-            if (score !== null) {
-                front9Total += score;
-                front9Count++;
+            // Calculate totals first
+            for (let hole = 0; hole < 9; hole++) {
+                if (player.scores[hole] !== null) {
+                    front9Total += player.scores[hole];
+                    front9Count++;
+                }
             }
-        }
-
-        html += `<td class="subtotal-cell">${front9Count > 0 ? front9Total : '—'}</td>`;
-
-        // Back 9
-        for (let hole = 9; hole < 18; hole++) {
-            const score = this.currentRoundScores[hole];
-            const isPopHole = this.isPopHole(player.name, hole);
-            const parClass = this.getParClass(score, this.parValues[hole], player.name, hole);
-            const popClass = isPopHole ? 'pop-hole' : '';
-
-            html += `<td class="score-cell ${parClass} ${popClass}">
-                <input type="text"
-                       class="score-input"
-                       data-hole="${hole}"
-                       value="${score !== null ? score : ''}"
-                       tabindex="${tabIndex}"
-                       maxlength="2"
-                       inputmode="numeric"
-                       pattern="[0-9]*">
-            </td>`;
-            tabIndex++;
-
-            if (score !== null) {
-                back9Total += score;
-                back9Count++;
+            for (let hole = 9; hole < 18; hole++) {
+                if (player.scores[hole] !== null) {
+                    back9Total += player.scores[hole];
+                    back9Count++;
+                }
             }
+            const total = this.calculateTotal(player);
+
+            // Desktop player row
+            desktopHtml += '<tr>';
+            desktopHtml += `<td class="player-name">${player.name}<button class="remove-player" data-player="${playerIndex}">✕</button></td>`;
+            for (let hole = 0; hole < 9; hole++) {
+                const score = player.scores[hole];
+                const displayScore = score !== null ? score : '';
+                const parClass = this.getParClass(score, this.parValues[hole]);
+                desktopHtml += `<td class="score-cell ${parClass}" data-player="${playerIndex}" data-hole="${hole}">
+                    <input type="text" class="score-input" data-player="${playerIndex}" data-hole="${hole}"
+                           value="${displayScore}" tabindex="${tabIndex}" maxlength="2" inputmode="numeric" pattern="[0-9]*">
+                </td>`;
+                tabIndex++;
+            }
+            desktopHtml += `<td class="subtotal-cell">${front9Count > 0 ? front9Total : '—'}</td>`;
+            for (let hole = 9; hole < 18; hole++) {
+                const score = player.scores[hole];
+                const displayScore = score !== null ? score : '';
+                const parClass = this.getParClass(score, this.parValues[hole]);
+                desktopHtml += `<td class="score-cell ${parClass}" data-player="${playerIndex}" data-hole="${hole}">
+                    <input type="text" class="score-input" data-player="${playerIndex}" data-hole="${hole}"
+                           value="${displayScore}" tabindex="${tabIndex}" maxlength="2" inputmode="numeric" pattern="[0-9]*">
+                </td>`;
+                tabIndex++;
+            }
+            desktopHtml += `<td class="subtotal-cell">${back9Count > 0 ? back9Total : '—'}</td>`;
+            desktopHtml += `<td class="total-cell">${total !== null ? total : '—'}</td></tr>`;
+
+            // Mobile Front 9 player row
+            mobileHtml += '<tr>';
+            mobileHtml += `<td class="player-name">${player.name}<button class="remove-player" data-player="${playerIndex}">✕</button></td>`;
+            for (let hole = 0; hole < 9; hole++) {
+                const score = player.scores[hole];
+                const displayScore = score !== null ? score : '';
+                const parClass = this.getParClass(score, this.parValues[hole]);
+                mobileHtml += `<td class="score-cell ${parClass}" data-player="${playerIndex}" data-hole="${hole}">
+                    <input type="text" class="score-input" data-player="${playerIndex}" data-hole="${hole}"
+                           value="${displayScore}" maxlength="2" inputmode="numeric" pattern="[0-9]*">
+                </td>`;
+            }
+            mobileHtml += `<td class="subtotal-cell">${front9Count > 0 ? front9Total : '—'}</td></tr>`;
+
+            // Mobile Back 9 player row
+            mobileBack9Html += '<tr>';
+            mobileBack9Html += `<td class="player-name">${player.name}</td>`;
+            for (let hole = 9; hole < 18; hole++) {
+                const score = player.scores[hole];
+                const displayScore = score !== null ? score : '';
+                const parClass = this.getParClass(score, this.parValues[hole]);
+                mobileBack9Html += `<td class="score-cell ${parClass}" data-player="${playerIndex}" data-hole="${hole}">
+                    <input type="text" class="score-input" data-player="${playerIndex}" data-hole="${hole}"
+                           value="${displayScore}" maxlength="2" inputmode="numeric" pattern="[0-9]*">
+                </td>`;
+            }
+            mobileBack9Html += `<td class="subtotal-cell">${back9Count > 0 ? back9Total : '—'}</td>`;
+            mobileBack9Html += `<td class="total-cell">${total !== null ? total : '—'}</td></tr>`;
+        });
+
+        desktopHtml += '</table></div>';
+        mobileHtml += '</table>' + mobileBack9Html + '</table></div>';
+
+        container.innerHTML = desktopHtml + mobileHtml;
+
+        // Add event listeners to inline score inputs
+        this.setupScoreInputListeners();
+
+        // Add click listeners to remove buttons
+        document.querySelectorAll('.remove-player').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const playerIndex = parseInt(e.target.dataset.player);
+                this.removePlayer(playerIndex);
+            });
+        });
+
+        // Restore focus if there's a pending focus position (e.g., after deleting a score)
+        if (this.pendingFocus) {
+            this.focusCell(this.pendingFocus.playerIndex, this.pendingFocus.hole);
+            this.pendingFocus = null;
         }
-
-        html += `<td class="subtotal-cell">${back9Count > 0 ? back9Total : '—'}</td>`;
-
-        // Total
-        const total = front9Count + back9Count > 0 ? front9Total + back9Total : null;
-        html += `<td class="total-cell">${total !== null ? total : '—'}</td>`;
-        html += '</tr>';
-
-        html += '</table>';
-
-        // Pop holes legend if player has pops
-        const popHoles = this.getPopHoles(player.name, 'general');
-        if (popHoles.length > 0) {
-            html += `<p class="pop-legend">* = Pop hole (Rob gets +1 stroke handicap)</p>`;
-        }
-
-        container.innerHTML = html;
-
-        // Setup listeners for the entry inputs
-        this.setupRoundEntryListeners();
-
-        // Update submit button state
-        this.updateSubmitButtonState();
     }
 
-    setupRoundEntryListeners() {
-        document.querySelectorAll('#roundEntryContainer .score-input').forEach(input => {
-            input.addEventListener('input', (e) => {
-                let value = e.target.value.replace(/[^0-9]/g, '');
-                if (value.length > 1) {
-                    value = value.slice(-1);
-                }
-                e.target.value = value;
-
-                const hole = parseInt(e.target.dataset.hole);
-                this.currentRoundScores[hole] = value ? parseInt(value) : null;
-
-                // Update par class for this cell
-                this.updateCellParClass(e.target, hole);
-
-                // Update totals inline (without re-rendering)
-                this.updateEntryTotalsInline();
-                this.updateSubmitButtonState();
-
-                // Auto-advance for single digits 1-9
-                if (value.length === 1 && value >= '1' && value <= '9') {
-                    // Use setTimeout to ensure the current input processing completes first
-                    setTimeout(() => this.moveToNextEntryCell(hole), 0);
-                }
+    setupScoreInputListeners() {
+        document.querySelectorAll('.score-input').forEach(input => {
+            // Save on blur
+            input.addEventListener('blur', (e) => {
+                this.saveInlineScore(e.target);
             });
 
+            // Handle keyboard navigation
             input.addEventListener('keydown', (e) => {
+                const playerIndex = parseInt(e.target.dataset.player);
                 const hole = parseInt(e.target.dataset.hole);
 
+                // Handle backspace - if empty, go to previous cell (don't auto-clear it)
                 if (e.key === 'Backspace' && e.target.value === '') {
                     e.preventDefault();
-                    if (hole > 0) {
-                        this.focusEntryCell(hole - 1);
+                    if (hole > 0 || playerIndex > 0) {
+                        // Move to previous cell without clearing it
+                        if (hole > 0) {
+                            this.focusCell(playerIndex, hole - 1);
+                        } else if (playerIndex > 0) {
+                            this.focusCell(playerIndex - 1, this.holes - 1);
+                        }
                     }
                     return;
+                }
+
+                // Save before handling navigation
+                if (['Enter', 'ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                    e.preventDefault();
+                    this.saveInlineScore(e.target);
                 }
 
                 switch (e.key) {
                     case 'Enter':
                     case 'ArrowRight':
-                        e.preventDefault();
-                        this.moveToNextEntryCell(hole);
+                        this.moveToNextCell(playerIndex, hole);
                         break;
                     case 'ArrowLeft':
-                        e.preventDefault();
-                        if (hole > 0) this.focusEntryCell(hole - 1);
+                        this.moveToPrevCell(playerIndex, hole);
+                        break;
+                    case 'ArrowDown':
+                        this.moveToNextPlayer(playerIndex, hole);
                         break;
                     case 'ArrowUp':
-                    case 'ArrowDown':
-                        e.preventDefault();
-                        // No row navigation in single-player entry
-                        break;
-                    case 'Tab':
-                        // Allow default tab behavior but could customize
+                        this.moveToPrevPlayer(playerIndex, hole);
                         break;
                     case 'Escape':
                         e.target.blur();
@@ -634,816 +478,213 @@ class FantasyGolf {
                 }
             });
 
+            // Select all text on focus
             input.addEventListener('focus', (e) => {
                 e.target.select();
+            });
+
+            // Handle input - auto-advance after single digit
+            input.addEventListener('input', (e) => {
+                let value = e.target.value.replace(/[^0-9]/g, '');
+
+                // If multiple digits entered (e.g., typing over existing value),
+                // keep only the last digit typed for smooth overwrite behavior
+                if (value.length > 1) {
+                    value = value.slice(-1);
+                }
+                e.target.value = value;
+
+                // Auto-advance after entering a single digit (1-9)
+                if (value.length === 1 && value >= '1' && value <= '9') {
+                    const playerIndex = parseInt(e.target.dataset.player);
+                    const hole = parseInt(e.target.dataset.hole);
+                    this.saveInlineScore(e.target);
+                    this.moveToNextCell(playerIndex, hole);
+                }
             });
         });
     }
 
-    moveToNextEntryCell(currentHole) {
-        if (currentHole < 17) {
-            this.focusEntryCell(currentHole + 1);
-        }
-    }
-
-    focusEntryCell(hole) {
-        const input = document.querySelector(`#roundEntryContainer .score-input[data-hole="${hole}"]`);
-        if (input) {
-            input.focus();
-        }
-    }
-
-    updateCellParClass(input, hole) {
-        const cell = input.closest('.score-cell');
-        if (!cell) return;
-
-        const score = this.currentRoundScores[hole];
-        const playerIndex = parseInt(document.getElementById('entryPlayer').value) || 0;
+    saveInlineScore(input) {
+        const playerIndex = parseInt(input.dataset.player);
+        const hole = parseInt(input.dataset.hole);
+        const newValue = input.value.trim();
         const player = this.players[playerIndex];
+        const currentScore = player.scores[hole];
 
-        // Remove existing par classes
-        cell.classList.remove('birdie', 'eagle', 'bogey', 'double-bogey');
-
-        // Add new par class if there's a score
-        if (score !== null) {
-            const parClass = this.getParClass(score, this.parValues[hole], player?.name, hole);
-            if (parClass) {
-                cell.classList.add(parClass);
+        // If empty, clear the score
+        if (newValue === '') {
+            if (currentScore !== null) {
+                player.scores[hole] = null;
+                this.syncInputs(playerIndex, hole, null);
+                // Set pending focus to previous hole before save triggers re-render
+                if (hole > 0) {
+                    this.pendingFocus = { playerIndex, hole: hole - 1 };
+                } else if (playerIndex > 0) {
+                    this.pendingFocus = { playerIndex: playerIndex - 1, hole: this.holes - 1 };
+                }
+                this.saveData();
+                this.updateTotal(playerIndex);
             }
+            return;
+        }
+
+        const newScore = parseInt(newValue);
+
+        // Validate score
+        if (isNaN(newScore) || newScore < 1 || newScore > 15) {
+            input.value = currentScore !== null ? currentScore : '';
+            return;
+        }
+
+        // Only update if it's a new score or better than current best
+        if (currentScore === null || newScore <= currentScore) {
+            player.scores[hole] = newScore;
+            this.syncInputs(playerIndex, hole, newScore);
+            this.saveData();
+            this.updateTotal(playerIndex);
+        } else {
+            // Score is worse - show feedback and revert
+            input.value = currentScore;
+            input.classList.add('rejected');
+            setTimeout(() => input.classList.remove('rejected'), 300);
         }
     }
 
-    updateEntryTotalsInline() {
-        // Calculate totals
+    // Sync input values across desktop and mobile layouts
+    syncInputs(playerIndex, hole, value) {
+        const inputs = document.querySelectorAll(`.score-input[data-player="${playerIndex}"][data-hole="${hole}"]`);
+        const displayValue = value !== null ? value : '';
+        const parClass = this.getParClass(value, this.parValues[hole]);
+
+        inputs.forEach(input => {
+            input.value = displayValue;
+            // Update the parent cell's par class
+            const cell = input.closest('.score-cell');
+            if (cell) {
+                cell.classList.remove('birdie', 'eagle', 'bogey', 'double-bogey');
+                if (parClass) {
+                    cell.classList.add(parClass);
+                }
+            }
+        });
+    }
+
+    updateTotal(playerIndex) {
+        const player = this.players[playerIndex];
+        const total = this.calculateTotal(player);
+
+        // Calculate front 9 and back 9 subtotals
         let front9Total = 0, front9Count = 0;
         let back9Total = 0, back9Count = 0;
-
-        for (let i = 0; i < 9; i++) {
-            if (this.currentRoundScores[i] !== null) {
-                front9Total += this.currentRoundScores[i];
+        for (let hole = 0; hole < 9; hole++) {
+            if (player.scores[hole] !== null) {
+                front9Total += player.scores[hole];
                 front9Count++;
             }
         }
-
-        for (let i = 9; i < 18; i++) {
-            if (this.currentRoundScores[i] !== null) {
-                back9Total += this.currentRoundScores[i];
+        for (let hole = 9; hole < 18; hole++) {
+            if (player.scores[hole] !== null) {
+                back9Total += player.scores[hole];
                 back9Count++;
             }
         }
 
-        // Update F9, B9, Total cells - target only the entry row, not the par row
-        const entryRow = document.querySelector('#roundEntryContainer .entry-row');
-        if (entryRow) {
-            const f9Cell = entryRow.querySelector('.subtotal-cell:first-of-type');
-            const b9Cell = entryRow.querySelector('.subtotal-cell:last-of-type');
-            const totalCell = entryRow.querySelector('.total-cell');
-
-            // Get all subtotal cells in entry row (there are 2: F9 and B9)
-            const subtotalCells = entryRow.querySelectorAll('.subtotal-cell');
-            if (subtotalCells.length >= 2) {
-                subtotalCells[0].textContent = front9Count > 0 ? front9Total : '—';
-                subtotalCells[1].textContent = back9Count > 0 ? back9Total : '—';
-            }
-            if (totalCell) {
-                totalCell.textContent = (front9Count + back9Count) > 0 ? (front9Total + back9Total) : '—';
-            }
-        }
-    }
-
-    updateSubmitButtonState() {
-        const btn = document.getElementById('submitRoundBtn');
-        const hint = document.querySelector('.submit-hint');
-        const completedHoles = this.currentRoundScores.filter(s => s !== null).length;
-
-        if (completedHoles === 18) {
-            btn.disabled = false;
-            btn.classList.add('ready');
-            hint.textContent = 'Ready to submit!';
-        } else {
-            btn.disabled = true;
-            btn.classList.remove('ready');
-            hint.textContent = `Enter all 18 holes to submit (${completedHoles}/18 completed)`;
-        }
-    }
-
-    clearCurrentRound() {
-        this.currentRoundScores = Array(18).fill(null);
-        this.renderRoundEntry();
-    }
-
-    // ============================================
-    // TAB 2: FANTASY SCORES (Read-Only Best Scores)
-    // ============================================
-    renderFantasyScorecard() {
-        const container = document.getElementById('fantasyScorecardContainer');
-
-        if (this.players.length === 0) {
-            container.innerHTML = '<p class="no-data">No players yet. Add some players to get started!</p>';
-            return;
-        }
-
-        let html = '<table class="scorecard fantasy-scorecard">';
-
-        // Header row
-        html += '<tr>';
-        html += '<th>Player</th>';
-        for (let i = 1; i <= 9; i++) {
-            html += `<th class="hole-header">${i}</th>`;
-        }
-        html += '<th class="subtotal-header">F9</th>';
-        for (let i = 10; i <= 18; i++) {
-            html += `<th class="hole-header">${i}</th>`;
-        }
-        html += '<th class="subtotal-header">B9</th>';
-        html += '<th class="gross-header">Gross</th>';
-        html += '<th class="net-header">Net</th>';
-        html += '</tr>';
-
-        // Par row
-        html += '<tr class="par-row">';
-        html += '<td><strong>Par</strong></td>';
-        let frontPar = 0, backPar = 0;
-        for (let i = 0; i < 9; i++) {
-            html += `<td>${this.parValues[i]}</td>`;
-            frontPar += this.parValues[i];
-        }
-        html += `<td class="subtotal-cell">${frontPar}</td>`;
-        for (let i = 9; i < 18; i++) {
-            html += `<td>${this.parValues[i]}</td>`;
-            backPar += this.parValues[i];
-        }
-        html += `<td class="subtotal-cell">${backPar}</td>`;
-        const totalPar = frontPar + backPar;
-        html += `<td><strong>${totalPar}</strong></td>`;
-        html += `<td><strong>${totalPar}</strong></td>`;
-        html += '</tr>';
-
-        // Player rows (read-only)
-        this.players.forEach((player, playerIndex) => {
-            html += '<tr>';
-            html += `<td class="player-name">
-                ${player.name}
-                <button class="remove-player" data-player="${playerIndex}">✕</button>
-            </td>`;
-
-            let front9Total = 0, front9Count = 0;
-            let back9Total = 0, back9Count = 0;
-
-            // Front 9
-            for (let hole = 0; hole < 9; hole++) {
-                const score = player.scores[hole];
-                const isPopHole = this.isPopHole(player.name, hole);
-                const netScore = this.getNetScore(player.name, hole, score);
-
-                let displayScore = '';
-                if (score !== null) {
-                    if (isPopHole) {
-                        displayScore = `${netScore} (${score})`;
-                    } else {
-                        displayScore = score;
-                    }
-                    front9Total += netScore;
-                    front9Count++;
+        // Update all scorecards (desktop and mobile)
+        document.querySelectorAll('.scorecard').forEach(table => {
+            const rows = table.querySelectorAll('tr');
+            const playerRow = rows[playerIndex + 2]; // +2 for header and par rows
+            if (playerRow) {
+                const totalCell = playerRow.querySelector('.total-cell');
+                if (totalCell) {
+                    totalCell.textContent = total !== null ? total : '—';
                 }
-
-                const parClass = this.getParClass(score, this.parValues[hole], player.name, hole);
-                const popClass = isPopHole ? 'pop-hole' : '';
-                html += `<td class="score-cell readonly ${parClass} ${popClass}">${displayScore || '—'}</td>`;
-            }
-
-            html += `<td class="subtotal-cell">${front9Count > 0 ? front9Total : '—'}</td>`;
-
-            // Back 9
-            for (let hole = 9; hole < 18; hole++) {
-                const score = player.scores[hole];
-                const isPopHole = this.isPopHole(player.name, hole);
-                const netScore = this.getNetScore(player.name, hole, score);
-
-                let displayScore = '';
-                if (score !== null) {
-                    if (isPopHole) {
-                        displayScore = `${netScore} (${score})`;
+                // Update subtotal cells
+                const subtotalCells = playerRow.querySelectorAll('.subtotal-cell');
+                subtotalCells.forEach(cell => {
+                    // Check which subtotal this is based on table class
+                    if (table.classList.contains('scorecard-front')) {
+                        cell.textContent = front9Count > 0 ? front9Total : '—';
+                    } else if (table.classList.contains('scorecard-back')) {
+                        cell.textContent = back9Count > 0 ? back9Total : '—';
                     } else {
-                        displayScore = score;
+                        // Desktop table has both subtotals
+                        const cellIndex = Array.from(playerRow.children).indexOf(cell);
+                        if (cellIndex === 10) { // F9 position
+                            cell.textContent = front9Count > 0 ? front9Total : '—';
+                        } else if (cellIndex === 20) { // B9 position
+                            cell.textContent = back9Count > 0 ? back9Total : '—';
+                        }
                     }
-                    back9Total += netScore;
-                    back9Count++;
-                }
-
-                const parClass = this.getParClass(score, this.parValues[hole], player.name, hole);
-                const popClass = isPopHole ? 'pop-hole' : '';
-                html += `<td class="score-cell readonly ${parClass} ${popClass}">${displayScore || '—'}</td>`;
-            }
-
-            html += `<td class="subtotal-cell">${back9Count > 0 ? back9Total : '—'}</td>`;
-
-            // Totals
-            const grossTotal = this.calculateGrossTotal(player);
-            const netTotal = this.calculateTotal(player);
-            html += `<td class="total-cell gross-total">${grossTotal !== null ? grossTotal : '—'}</td>`;
-            html += `<td class="total-cell net-total">${netTotal !== null ? netTotal : '—'}</td>`;
-            html += '</tr>';
-        });
-
-        html += '</table>';
-        html += '<p class="fantasy-note">Best score per hole from all submitted rounds. Rob\'s pop holes show as "net (gross)".</p>';
-
-        container.innerHTML = html;
-
-        // Add remove player listeners
-        document.querySelectorAll('#fantasyScorecardContainer .remove-player').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const playerIndex = parseInt(e.target.dataset.player);
-                this.removePlayer(playerIndex);
-            });
-        });
-    }
-
-    renderFantasyScoring() {
-        const container = document.getElementById('fantasyScores');
-        if (!container) return;
-
-        if (this.players.length === 0) {
-            container.innerHTML = '<p class="no-data">No players yet.</p>';
-            return;
-        }
-
-        let html = '';
-
-        this.players.forEach(player => {
-            const grossTotal = this.calculateGrossTotal(player);
-            const netTotal = this.calculateTotal(player);
-            const kickerStatus = this.getKickerStatus(player);
-            const kickerDeduction = kickerStatus.used;
-            const fantasyNet = netTotal !== null ? netTotal - kickerDeduction : null;
-            const confirmedKickers = player.confirmedKickers || [];
-            const availableKickers = 2 - kickerStatus.used;
-
-            html += `
-                <div class="player-fantasy-card">
-                    <h4>${player.name}</h4>
-                    <div class="fantasy-row">
-                        <span>Gross Total:</span>
-                        <span>${grossTotal !== null ? grossTotal : '—'}</span>
-                    </div>
-                    <div class="fantasy-row">
-                        <span>Pop Adjustments:</span>
-                        <span>${grossTotal !== null && netTotal !== null ? (netTotal - grossTotal) : '—'}</span>
-                    </div>
-                    <div class="fantasy-row">
-                        <span>Net Total:</span>
-                        <span>${netTotal !== null ? netTotal : '—'}</span>
-                    </div>
-                    <div class="fantasy-row">
-                        <span>Kickers Applied:</span>
-                        <span class="kicker-deduction">${kickerDeduction > 0 ? '-' + kickerDeduction : '0'}</span>
-                    </div>
-                    <div class="fantasy-row net-total">
-                        <span>Fantasy Score:</span>
-                        <span>${fantasyNet !== null ? fantasyNet : '—'}</span>
-                    </div>
-                    <div class="kicker-badges">
-                        ${confirmedKickers.map(k => `<span class="kicker-badge">${this.kickerTypes[k]?.name || k}</span>`).join('')}
-                        ${Array(availableKickers).fill('<span class="kicker-badge available">Available</span>').join('')}
-                    </div>
-                </div>
-            `;
-        });
-
-        container.innerHTML = html;
-    }
-
-    // ============================================
-    // TAB 3: ROUND HISTORY
-    // ============================================
-    populateHistoryPlayerFilter() {
-        const select = document.getElementById('historyPlayerFilter');
-        const currentValue = select.value;
-
-        select.innerHTML = '<option value="all">All Players</option>';
-        this.players.forEach(player => {
-            select.innerHTML += `<option value="${player.name}">${player.name}</option>`;
-        });
-
-        if (currentValue && this.players.some(p => p.name === currentValue)) {
-            select.value = currentValue;
-        }
-    }
-
-    renderHistory() {
-        const container = document.getElementById('roundsList');
-        const filterValue = document.getElementById('historyPlayerFilter').value;
-
-        let allRounds = [];
-        this.players.forEach(player => {
-            (player.rounds || []).forEach(round => {
-                allRounds.push({
-                    ...round,
-                    playerName: player.name
                 });
-            });
-        });
-
-        allRounds.sort((a, b) => b.date - a.date);
-
-        if (filterValue !== 'all') {
-            allRounds = allRounds.filter(r => r.playerName === filterValue);
-        }
-
-        if (allRounds.length === 0) {
-            container.innerHTML = '<div class="no-rounds">No rounds submitted yet. Use the Enter Round tab to submit a round.</div>';
-            return;
-        }
-
-        let html = '';
-        allRounds.forEach(round => {
-            html += this.renderRoundCard(round);
-        });
-
-        container.innerHTML = html;
-
-        // Add edit button listeners
-        document.querySelectorAll('.edit-round-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const roundId = e.target.dataset.roundId;
-                const playerName = e.target.dataset.playerName;
-                this.editRound(playerName, roundId);
-            });
-        });
-
-        // Add delete button listeners
-        document.querySelectorAll('.delete-round-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const roundId = e.target.dataset.roundId;
-                const playerName = e.target.dataset.playerName;
-                this.deleteRound(playerName, roundId);
-            });
-        });
-    }
-
-    renderRoundCard(round) {
-        const total = round.scores.reduce((a, b) => a + (b || 0), 0);
-        const date = new Date(round.date).toLocaleDateString('en-US', {
-            weekday: 'short',
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-
-        const confirmedKickers = round.kickers?.confirmed || [];
-        const kickerBadges = confirmedKickers.map(k =>
-            `<span class="kicker-badge">${this.kickerTypes[k]?.name || k}</span>`
-        ).join('');
-
-        let scoresHtml = `
-            <div class="round-nine-label">Front 9</div>
-            ${Array.from({length: 9}, (_, i) => `<div class="hole-label">${i + 1}</div>`).join('')}
-            ${round.scores.slice(0, 9).map(s => `<div class="score-value">${s || '-'}</div>`).join('')}
-            <div class="round-nine-label">Back 9</div>
-            ${Array.from({length: 9}, (_, i) => `<div class="hole-label">${i + 10}</div>`).join('')}
-            ${round.scores.slice(9, 18).map(s => `<div class="score-value">${s || '-'}</div>`).join('')}
-        `;
-
-        return `
-            <div class="round-card" data-round-id="${round.id}">
-                <div class="round-card-header">
-                    <span class="round-player">${round.playerName}</span>
-                    <span class="round-date">${date}</span>
-                </div>
-                <div class="round-scores-grid">
-                    ${scoresHtml}
-                </div>
-                <div class="round-footer">
-                    <span class="round-total">Total: ${total} (${total > 72 ? '+' : ''}${total - 72})</span>
-                    <div class="round-kickers">${kickerBadges}</div>
-                    <div class="round-actions">
-                        <button class="btn btn-secondary btn-sm edit-round-btn"
-                                data-round-id="${round.id}"
-                                data-player-name="${round.playerName}">
-                            Edit
-                        </button>
-                        <button class="btn btn-danger btn-sm delete-round-btn"
-                                data-round-id="${round.id}"
-                                data-player-name="${round.playerName}">
-                            Delete
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    editRound(playerName, roundId) {
-        const player = this.players.find(p => p.name === playerName);
-        if (!player) return;
-
-        const round = (player.rounds || []).find(r => r.id === roundId);
-        if (!round) return;
-
-        // Load the round into the entry form
-        this.currentRoundScores = [...round.scores];
-
-        // Set the player dropdown
-        const playerIndex = this.players.indexOf(player);
-        document.getElementById('entryPlayer').value = playerIndex;
-
-        // Set the date
-        const dateInput = document.getElementById('entryDate');
-        dateInput.value = new Date(round.date).toISOString().split('T')[0];
-
-        // Mark that we're editing
-        this.editingRound = { playerName, roundId };
-
-        // Switch to enter round tab
-        this.switchTab('enterRound');
-    }
-
-    deleteRound(playerName, roundId) {
-        const player = this.players.find(p => p.name === playerName);
-        if (!player) return;
-
-        if (!confirm(`Delete this round for ${playerName}? This will also update their best scores.`)) {
-            return;
-        }
-
-        // Find and remove the round
-        const roundIndex = (player.rounds || []).findIndex(r => r.id === roundId);
-        if (roundIndex !== -1) {
-            // Check if this round had confirmed kickers and remove them
-            const round = player.rounds[roundIndex];
-            const confirmedKickers = round.kickers?.confirmed || [];
-            confirmedKickers.forEach(kickerId => {
-                const idx = player.confirmedKickers.indexOf(kickerId);
-                if (idx !== -1) {
-                    player.confirmedKickers.splice(idx, 1);
-                    player.kickersUsed = Math.max(0, player.kickersUsed - 1);
-                }
-            });
-
-            player.rounds.splice(roundIndex, 1);
-
-            // Recalculate best scores
-            this.recalculateBestScores(player);
-
-            this.saveData();
-            this.renderHistory();
-        }
-    }
-
-    // ============================================
-    // ROUND SUBMISSION
-    // ============================================
-    showRoundSubmissionModal() {
-        const completedHoles = this.currentRoundScores.filter(s => s !== null).length;
-        if (completedHoles !== 18) {
-            alert('Please complete all 18 holes before submitting.');
-            return;
-        }
-
-        const modal = document.getElementById('roundModal');
-        const playerIndex = parseInt(document.getElementById('entryPlayer').value);
-        const player = this.players[playerIndex];
-        const dateInput = document.getElementById('entryDate');
-
-        // Update modal title based on editing state
-        const modalTitle = document.querySelector('#roundModal h3');
-        modalTitle.textContent = this.editingRound ? 'Update Round' : 'Confirm Round Submission';
-
-        // Calculate round summary
-        const total = this.currentRoundScores.reduce((sum, s) => sum + (s || 0), 0);
-        const selectedDate = dateInput.value
-            ? new Date(dateInput.value + 'T12:00:00').toLocaleDateString()
-            : 'Not selected';
-
-        const summaryHtml = `
-            <div class="summary-row">
-                <span>Player:</span>
-                <span><strong>${player.name}</strong></span>
-            </div>
-            <div class="summary-row">
-                <span>Date:</span>
-                <span>${selectedDate}</span>
-            </div>
-            <div class="summary-row">
-                <span>Round Total:</span>
-                <span><strong>${total}</strong> (${total > 72 ? '+' : ''}${total - 72})</span>
-            </div>
-        `;
-        document.getElementById('roundSummary').innerHTML = summaryHtml;
-
-        // Detect kickers for this round
-        const detectedKickers = this.detectKickers(player, this.currentRoundScores);
-        const kickerStatus = this.getKickerStatus(player);
-
-        document.getElementById('kickerStatusText').textContent =
-            `${kickerStatus.used}/2 kickers used this year. ${kickerStatus.remaining} remaining.`;
-
-        // Generate detected kickers HTML
-        let detectedHtml = '';
-        const autoDetectKickers = ['beatPersonalBest', 'holeInOne', 'albatross', 'noDoubleBogeys'];
-
-        autoDetectKickers.forEach(kickerId => {
-            const kicker = this.kickerTypes[kickerId];
-            const isDetected = detectedKickers.includes(kickerId);
-            const canApply = this.canApplyKicker(player, kickerId);
-            const alreadyUsed = (player.confirmedKickers || []).includes(kickerId);
-
-            if (isDetected || alreadyUsed) {
-                let statusText = '';
-                let disabledAttr = '';
-                let itemClass = 'kicker-item';
-
-                if (alreadyUsed) {
-                    statusText = '<span class="kicker-unavailable">(Already used)</span>';
-                    disabledAttr = 'disabled';
-                    itemClass += ' disabled';
-                } else if (!canApply) {
-                    statusText = '<span class="kicker-unavailable">(Max reached)</span>';
-                    disabledAttr = 'disabled';
-                    itemClass += ' disabled';
-                } else if (isDetected) {
-                    itemClass += ' detected';
-                }
-
-                detectedHtml += `
-                    <div class="${itemClass}">
-                        <input type="checkbox" id="kicker_${kickerId}" value="${kickerId}" ${disabledAttr}>
-                        <label for="kicker_${kickerId}">${kicker.name}</label>
-                        <span class="kicker-value">${kicker.value}</span>
-                        ${statusText}
-                    </div>
-                `;
             }
         });
-
-        if (!detectedHtml) {
-            detectedHtml = '<p class="no-kickers">No auto-detected kickers for this round.</p>';
-        }
-        document.getElementById('detectedKickers').innerHTML = detectedHtml;
-
-        // Generate manual kickers HTML
-        const fullWedge = this.kickerTypes.fullWedge;
-        const canApplyFullWedge = this.canApplyKicker(player, 'fullWedge');
-        const fullWedgeUsed = (player.confirmedKickers || []).includes('fullWedge');
-
-        let fullWedgeStatus = '';
-        let fullWedgeDisabled = '';
-        let fullWedgeClass = 'kicker-item';
-
-        if (fullWedgeUsed) {
-            fullWedgeStatus = '<span class="kicker-unavailable">(Already used)</span>';
-            fullWedgeDisabled = 'disabled';
-            fullWedgeClass += ' disabled';
-        } else if (!canApplyFullWedge) {
-            fullWedgeStatus = '<span class="kicker-unavailable">(Max reached)</span>';
-            fullWedgeDisabled = 'disabled';
-            fullWedgeClass += ' disabled';
-        }
-
-        document.getElementById('manualKickers').innerHTML = `
-            <h5>Manual Kickers</h5>
-            <div class="${fullWedgeClass}">
-                <input type="checkbox" id="kicker_fullWedge" value="fullWedge" ${fullWedgeDisabled}>
-                <label for="kicker_fullWedge">${fullWedge.name}</label>
-                <span class="kicker-value">${fullWedge.value}</span>
-                ${fullWedgeStatus}
-            </div>
-        `;
-
-        modal.style.display = 'block';
     }
 
-    confirmRoundSubmission() {
-        const playerIndex = parseInt(document.getElementById('entryPlayer').value);
-        const player = this.players[playerIndex];
-        const dateInput = document.getElementById('entryDate');
+    moveToNextCell(playerIndex, hole) {
+        const nextHole = hole + 1;
+        if (nextHole < this.holes) {
+            this.focusCell(playerIndex, nextHole);
+        } else if (playerIndex + 1 < this.players.length) {
+            this.focusCell(playerIndex + 1, 0);
+        }
+    }
 
-        const selectedDate = dateInput.value
-            ? new Date(dateInput.value + 'T12:00:00').getTime()
-            : Date.now();
+    moveToPrevCell(playerIndex, hole) {
+        const prevHole = hole - 1;
+        if (prevHole >= 0) {
+            this.focusCell(playerIndex, prevHole);
+        } else if (playerIndex > 0) {
+            this.focusCell(playerIndex - 1, this.holes - 1);
+        }
+    }
 
-        // Get selected kickers
-        const selectedKickers = [];
-        document.querySelectorAll('#roundModal input[type="checkbox"]:checked').forEach(cb => {
-            selectedKickers.push(cb.value);
-        });
+    moveToNextPlayer(playerIndex, hole) {
+        if (playerIndex + 1 < this.players.length) {
+            this.focusCell(playerIndex + 1, hole);
+        }
+    }
 
-        // Check if editing existing round
-        if (this.editingRound && this.editingRound.playerName === player.name) {
-            const existingRound = (player.rounds || []).find(r => r.id === this.editingRound.roundId);
-            if (existingRound) {
-                existingRound.scores = [...this.currentRoundScores];
-                existingRound.date = selectedDate;
-                existingRound.kickers.detected = this.detectKickers(player, this.currentRoundScores);
+    moveToPrevPlayer(playerIndex, hole) {
+        if (playerIndex > 0) {
+            this.focusCell(playerIndex - 1, hole);
+        }
+    }
 
-                // Note: We preserve existing confirmed kickers on edit
-                this.recalculateBestScores(player);
-
-                this.saveData();
-                this.hideRoundModal();
-                this.clearCurrentRound();
-                this.editingRound = null;
-                alert(`Round updated for ${player.name}!`);
+    focusCell(playerIndex, hole) {
+        // Find the visible input (desktop or mobile layout)
+        const inputs = document.querySelectorAll(`.score-input[data-player="${playerIndex}"][data-hole="${hole}"]`);
+        for (const input of inputs) {
+            if (input.offsetParent !== null) {
+                input.focus();
                 return;
             }
         }
-
-        // Create new round
-        const round = {
-            id: `round_${Date.now()}`,
-            date: selectedDate,
-            scores: [...this.currentRoundScores],
-            kickers: {
-                detected: this.detectKickers(player, this.currentRoundScores),
-                confirmed: selectedKickers
-            }
-        };
-
-        player.rounds = player.rounds || [];
-        player.rounds.push(round);
-
-        // Update best scores
-        for (let i = 0; i < 18; i++) {
-            if (this.currentRoundScores[i] !== null) {
-                if (player.scores[i] === null || this.currentRoundScores[i] < player.scores[i]) {
-                    player.scores[i] = this.currentRoundScores[i];
-                }
-            }
+        // Fallback to first input if visibility check fails
+        if (inputs.length > 0) {
+            inputs[0].focus();
         }
-
-        // Apply confirmed kickers
-        selectedKickers.forEach(kickerId => {
-            this.applyKicker(player, kickerId);
-        });
-
-        this.saveData();
-        this.hideRoundModal();
-        this.clearCurrentRound();
-        this.editingRound = null;
-
-        const kickerText = selectedKickers.length > 0
-            ? ` with ${selectedKickers.length} kicker(s) applied!`
-            : '!';
-        alert(`Round saved for ${player.name}${kickerText}`);
     }
 
-    hideRoundModal() {
-        document.getElementById('roundModal').style.display = 'none';
-    }
-
-    recalculateBestScores(player) {
-        const bestScores = Array(18).fill(null);
-
-        (player.rounds || []).forEach(round => {
-            for (let i = 0; i < 18; i++) {
-                if (round.scores[i] !== null) {
-                    if (bestScores[i] === null || round.scores[i] < bestScores[i]) {
-                        bestScores[i] = round.scores[i];
-                    }
-                }
-            }
-        });
-
-        player.scores = bestScores;
-    }
-
-    // ============================================
-    // HELPER METHODS
-    // ============================================
     calculateTotal(player) {
-        let total = 0;
-        let hasScores = false;
-        for (let hole = 0; hole < 18; hole++) {
-            const score = player.scores[hole];
-            if (score !== null) {
-                hasScores = true;
-                total += this.getNetScore(player.name, hole, score);
-            }
-        }
-        return hasScores ? total : null;
-    }
-
-    calculateGrossTotal(player) {
         const validScores = player.scores.filter(score => score !== null);
         if (validScores.length === 0) return null;
         return validScores.reduce((sum, score) => sum + score, 0);
     }
 
-    getParClass(score, par, playerName = null, holeIndex = null) {
+    // Returns CSS class for score relative to par
+    // birdie (1 under) = circle, bogey (1 over) = square, double+ = double shapes
+    getParClass(score, par) {
         if (score === null || par === null) return '';
-
-        let effectiveScore = score;
-        if (playerName && holeIndex !== null && this.isPopHole(playerName, holeIndex)) {
-            effectiveScore = score - 1;
-        }
-
-        const diff = effectiveScore - par;
-        if (diff === 0) return '';
-        if (diff === -1) return 'birdie';
-        if (diff <= -2) return 'eagle';
-        if (diff === 1) return 'bogey';
-        if (diff >= 2) return 'double-bogey';
+        const diff = score - par;
+        if (diff === 0) return ''; // par - no decoration
+        if (diff === -1) return 'birdie'; // 1 under par - circle
+        if (diff <= -2) return 'eagle'; // 2+ under par - double circle
+        if (diff === 1) return 'bogey'; // 1 over par - square
+        if (diff >= 2) return 'double-bogey'; // 2+ over par - double square
         return '';
     }
 
-    getPopHoles(playerName, context = 'general') {
-        const config = this.playerConfig[playerName];
-        if (!config || !config.pops) return [];
-        return context === 'noDoubleBogey'
-            ? config.pops.noDoubleBogey || []
-            : config.pops.general || [];
-    }
-
-    isPopHole(playerName, holeIndex, context = 'general') {
-        return this.getPopHoles(playerName, context).includes(holeIndex);
-    }
-
-    getNetScore(playerName, holeIndex, grossScore) {
-        if (grossScore === null) return null;
-        if (this.isPopHole(playerName, holeIndex)) {
-            return grossScore - 1;
-        }
-        return grossScore;
-    }
-
-    detectKickers(player, roundScores) {
-        const detected = [];
-        const config = this.playerConfig[player.name] || {};
-
-        const validScores = roundScores.filter(s => s !== null);
-        if (validScores.length !== 18) {
-            return detected;
-        }
-
-        const total = roundScores.reduce((a, b) => a + (b || 0), 0);
-        if (config.personalBest && total < config.personalBest) {
-            detected.push('beatPersonalBest');
-        }
-
-        if (roundScores.some(s => s === 1)) {
-            detected.push('holeInOne');
-        }
-
-        for (let i = 0; i < 18; i++) {
-            if (roundScores[i] !== null && roundScores[i] === this.parValues[i] - 3) {
-                detected.push('albatross');
-                break;
-            }
-        }
-
-        const noDoubleBogeyPopHoles = this.getPopHoles(player.name, 'noDoubleBogey');
-        let hasDoubleBogey = false;
-        for (let i = 0; i < 18; i++) {
-            if (roundScores[i] !== null) {
-                const adjustedScore = noDoubleBogeyPopHoles.includes(i)
-                    ? roundScores[i] - 1
-                    : roundScores[i];
-                if (adjustedScore > this.parValues[i] + 1) {
-                    hasDoubleBogey = true;
-                    break;
-                }
-            }
-        }
-        if (!hasDoubleBogey) {
-            detected.push('noDoubleBogeys');
-        }
-
-        return detected;
-    }
-
-    canApplyKicker(player, kickerId) {
-        if ((player.kickersUsed || 0) >= 2) {
-            return false;
-        }
-        if ((player.confirmedKickers || []).includes(kickerId)) {
-            return false;
-        }
-        return true;
-    }
-
-    applyKicker(player, kickerId) {
-        if (!this.canApplyKicker(player, kickerId)) {
-            return false;
-        }
-        player.kickersUsed = (player.kickersUsed || 0) + 1;
-        player.confirmedKickers = player.confirmedKickers || [];
-        player.confirmedKickers.push(kickerId);
-        return true;
-    }
-
-    getKickerStatus(player) {
-        return {
-            used: player.kickersUsed || 0,
-            remaining: 2 - (player.kickersUsed || 0),
-            confirmed: player.confirmedKickers || []
-        };
-    }
-
-    // ============================================
-    // PLAYER MANAGEMENT
-    // ============================================
     showPlayerModal() {
         document.getElementById('playerNameInput').value = '';
         document.getElementById('playerModal').style.display = 'block';
@@ -1470,31 +711,24 @@ class FantasyGolf {
 
         this.players.push({
             name: name,
-            scores: Array(18).fill(null),
-            rounds: [],
-            kickersUsed: 0,
-            confirmedKickers: []
+            scores: Array(18).fill(null)
         });
 
         this.saveData();
-        this.populatePlayerDropdowns();
-        this.renderAll();
+        this.render();
         this.hidePlayerModal();
     }
 
     removePlayer(playerIndex) {
         const player = this.players[playerIndex];
-        if (confirm(`Are you sure you want to remove ${player.name}? All their scores and rounds will be lost.`)) {
+        if (confirm(`Are you sure you want to remove ${player.name}? All their scores will be lost.`)) {
             this.players.splice(playerIndex, 1);
             this.saveData();
-            this.populatePlayerDropdowns();
-            this.renderAll();
+            this.render();
         }
     }
 
-    // ============================================
-    // OCR PROCESSING
-    // ============================================
+    // OCR Processing
     async processScorecard(file) {
         const modal = document.getElementById('ocrModal');
         modal.style.display = 'block';
@@ -1524,6 +758,7 @@ class FantasyGolf {
     extractScoresFromText(text) {
         console.log('OCR Raw Text:', text);
 
+        // Get all numbers from the OCR text in order
         const allMatches = text.match(/\b\d+\b/g);
         if (!allMatches) {
             console.log('No numbers found in OCR text');
@@ -1533,18 +768,21 @@ class FantasyGolf {
         const numbers = allMatches.map(n => parseInt(n));
         console.log('All numbers found:', numbers);
 
+        // STRATEGY 1: Find hole number anchors (1-9 and 10-18 sequences)
         const scores = this.extractByAnchorPattern(numbers);
         if (scores.length >= 9) {
             console.log('Anchor strategy succeeded:', scores);
             return scores;
         }
 
+        // STRATEGY 2: Line-by-line analysis
         const lineScores = this.extractByLineAnalysis(text);
         if (lineScores.length >= 9) {
             console.log('Line analysis succeeded:', lineScores);
             return lineScores;
         }
 
+        // STRATEGY 3: Find valid score groups (exclude obvious non-scores)
         const groupScores = this.extractByFiltering(numbers);
         if (groupScores.length >= 9) {
             console.log('Filtering strategy succeeded:', groupScores);
@@ -1555,64 +793,113 @@ class FantasyGolf {
         return numbers.filter(n => n >= 1 && n <= 12).slice(0, 18);
     }
 
+    // Strategy 1: Find 1-9 and 10-18 anchor sequences
     extractByAnchorPattern(numbers) {
+        console.log('Starting anchor pattern extraction with', numbers.length, 'numbers');
+
+        // Find front 9 hole numbers: exactly 1,2,3,4,5,6,7,8,9 in sequence
         let front9Anchor = -1;
         for (let i = 0; i <= numbers.length - 9; i++) {
             const slice = numbers.slice(i, i + 9);
-            if (slice[0] === 1 && slice[8] === 9 && slice.every((n, idx) => n === idx + 1)) {
+            if (slice[0] === 1 && slice[8] === 9 &&
+                slice.every((n, idx) => n === idx + 1)) {
                 front9Anchor = i;
                 break;
             }
         }
 
+        // Find back 9 hole numbers: look for 10 followed by increasing numbers ending in 18
         let back9Anchor = -1;
         for (let i = 0; i <= numbers.length - 9; i++) {
             const slice = numbers.slice(i, i + 9);
+            // More lenient: starts with 10, ends with 18, generally increasing
             if (slice[0] === 10 && slice[8] === 18) {
                 back9Anchor = i;
                 break;
             }
         }
 
+        console.log('Anchors found - Front9:', front9Anchor, 'Back9:', back9Anchor);
+
         const scores = [];
+
+        // GHIN format: after hole numbers (9) comes par row (9 values + total = 10), then scores (9 values)
+        // So scores start at anchor + 9 (holes) + 10 (par + total) = anchor + 19
 
         if (front9Anchor !== -1) {
             const scoresStart = front9Anchor + 19;
             if (scoresStart + 9 <= numbers.length) {
                 const front9Scores = numbers.slice(scoresStart, scoresStart + 9);
+                console.log('Front 9 scores candidate:', front9Scores);
                 if (front9Scores.every(s => s >= 1 && s <= 15)) {
                     scores.push(...front9Scores);
                 }
             }
         }
 
-        if (scores.length === 9 && back9Anchor !== -1) {
-            const scoresStart = back9Anchor + 19;
-            if (scoresStart + 9 <= numbers.length) {
-                const back9Scores = numbers.slice(scoresStart, scoresStart + 9);
-                if (back9Scores.every(s => s >= 1 && s <= 15)) {
-                    scores.push(...back9Scores);
+        // If we have front 9, now find back 9
+        if (scores.length === 9) {
+            console.log('Front 9 found, searching for back 9...');
+
+            // Calculate where front 9 section ends
+            // front9Anchor + 9 (holes) + 10 (par+total) + 9 (scores) + 1 (total) = front9Anchor + 29
+            const front9SectionEnd = front9Anchor + 29;
+
+            // Method 1: If we found back 9 anchor, use it
+            if (back9Anchor !== -1 && back9Anchor >= front9SectionEnd) {
+                const scoresStart = back9Anchor + 19;
+                if (scoresStart + 9 <= numbers.length) {
+                    const back9Scores = numbers.slice(scoresStart, scoresStart + 9);
+                    console.log('Back 9 scores via anchor:', back9Scores);
+                    if (back9Scores.every(s => s >= 1 && s <= 15)) {
+                        scores.push(...back9Scores);
+                        return scores;
+                    }
                 }
             }
-        }
 
-        return scores;
-    }
+            // Method 2: Scan for back 9 structure starting after front 9
+            // Look for a "10" that starts the back 9 hole numbers
+            for (let i = front9SectionEnd; i <= numbers.length - 28; i++) {
+                if (numbers[i] === 10) {
+                    // This might be the start of back 9 holes
+                    // Skip 9 hole numbers + 10 par values = 19, then get 9 scores
+                    const potentialScores = numbers.slice(i + 19, i + 28);
+                    console.log(`Checking back 9 at position ${i}:`, potentialScores);
 
-    extractByLineAnalysis(text) {
-        const lines = text.split('\n').map(line => line.trim()).filter(line => line);
-        const scores = [];
+                    if (potentialScores.length === 9 &&
+                        potentialScores.every(s => s >= 1 && s <= 15) &&
+                        !potentialScores.every(s => s >= 3 && s <= 5)) { // Not all par values
+                        console.log('Found back 9 scores:', potentialScores);
+                        scores.push(...potentialScores);
+                        return scores;
+                    }
+                }
+            }
 
-        for (const line of lines) {
-            const nums = line.match(/\b\d+\b/g);
-            if (nums && nums.length >= 9) {
-                const lineNumbers = nums.map(n => parseInt(n));
-                const validScores = lineNumbers.filter(n => n >= 2 && n <= 12);
-                if (validScores.length >= 9 && validScores.length <= 10) {
-                    const total = validScores.reduce((a, b) => a + b, 0);
-                    if (total >= 30 && total <= 65) {
-                        scores.push(...validScores.slice(0, 9));
-                        if (scores.length >= 18) break;
+            // Method 3: Find any valid 9-score sequence after front 9
+            console.log('Trying fallback scan from position', front9SectionEnd);
+            for (let i = front9SectionEnd; i <= numbers.length - 9; i++) {
+                const candidate = numbers.slice(i, i + 9);
+
+                // Skip hole number sequences (10-18)
+                if (candidate[0] >= 10 && candidate[0] <= 18 &&
+                    candidate.some(n => n >= 10 && n <= 18)) continue;
+
+                // Skip pure par sequences (all 3-5)
+                if (candidate.every(n => n >= 3 && n <= 5)) continue;
+
+                // Skip if contains totals (numbers > 20)
+                if (candidate.some(n => n > 15)) continue;
+
+                // Valid score sequence
+                if (candidate.every(s => s >= 1 && s <= 15)) {
+                    const total = candidate.reduce((a, b) => a + b, 0);
+                    // Reasonable 9-hole score total (27-63 for bogey to triple bogey average)
+                    if (total >= 27 && total <= 70) {
+                        console.log('Found back 9 via fallback scan:', candidate, 'total:', total);
+                        scores.push(...candidate);
+                        return scores;
                     }
                 }
             }
@@ -1621,18 +908,65 @@ class FantasyGolf {
         return scores;
     }
 
-    extractByFiltering(numbers) {
-        const validScores = numbers.filter(n => n >= 2 && n <= 12);
+    // Strategy 2: Analyze text line by line
+    extractByLineAnalysis(text) {
+        const lines = text.split('\n');
+        const scoreRows = [];
 
-        if (validScores.length >= 18) {
-            const front9 = validScores.slice(0, 9);
-            const back9 = validScores.slice(9, 18);
-            const total = [...front9, ...back9].reduce((a, b) => a + b, 0);
-            if (total >= 65 && total <= 130) {
-                return [...front9, ...back9];
+        for (const line of lines) {
+            const matches = line.match(/\b\d+\b/g);
+            if (!matches || matches.length < 9) continue;
+
+            const numbers = matches.map(n => parseInt(n));
+            const first9 = numbers.slice(0, 9);
+
+            // Skip hole number rows (1-9 or 10-18 sequence)
+            if (first9.every((n, i) => n === i + 1)) continue;
+            if (first9.every((n, i) => n === i + 10)) continue;
+
+            // Skip par rows (all values 3-5)
+            if (first9.every(n => n >= 3 && n <= 5)) continue;
+
+            // This could be a score row - check if values are reasonable
+            if (first9.every(n => n >= 1 && n <= 15)) {
+                scoreRows.push(first9);
             }
         }
 
+        console.log('Score rows found by line analysis:', scoreRows);
+
+        const scores = [];
+        if (scoreRows.length >= 2) {
+            scores.push(...scoreRows[0], ...scoreRows[1]);
+        } else if (scoreRows.length === 1) {
+            scores.push(...scoreRows[0]);
+        }
+
+        return scores;
+    }
+
+    // Strategy 3: Filter and group numbers
+    extractByFiltering(numbers) {
+        // Remove obvious non-scores: hole numbers (1-9, 10-18), large totals (>20)
+        // Keep numbers that could be golf scores (1-15)
+
+        // First, try to identify and skip the hole/par sections
+        // Look for groups of 9 numbers that look like scores
+
+        const validScores = numbers.filter(n => n >= 2 && n <= 12);
+
+        // Golf scores typically cluster: par or worse (4-8 for most holes)
+        // Try to find 18 consecutive valid scores
+        for (let i = 0; i <= validScores.length - 18; i++) {
+            const candidate = validScores.slice(i, i + 18);
+            // Check if this looks like a realistic round (total 70-120)
+            const total = candidate.reduce((a, b) => a + b, 0);
+            if (total >= 65 && total <= 130) {
+                return candidate;
+            }
+        }
+
+        // Just return the first 18 valid-looking scores
         return validScores.slice(0, 18);
     }
 
@@ -1640,45 +974,55 @@ class FantasyGolf {
         document.getElementById('ocrProgress').style.display = 'none';
         document.getElementById('ocrResults').style.display = 'block';
 
-        let html = '<div class="ocr-scores-grid">';
+        const playerSelect = document.getElementById('ocrPlayerSelect');
+        playerSelect.innerHTML = this.players.map((p, i) =>
+            `<option value="${i}">${p.name}</option>`
+        ).join('');
 
-        html += '<div class="ocr-nine"><strong>Front 9</strong></div>';
-        for (let i = 0; i < 9; i++) {
-            const score = scores[i] || '';
-            html += `
-                <div class="ocr-hole">
-                    <label>Hole ${i + 1}</label>
-                    <input type="number" class="ocr-score-input" data-hole="${i}" value="${score}" min="1" max="15">
-                </div>
-            `;
+        const extractedScoresDiv = document.getElementById('extractedScores');
+        if (scores.length === 0) {
+            extractedScoresDiv.innerHTML = '<p>No scores detected. Please try a clearer image or enter scores manually.</p>';
+        } else {
+            let html = '<p>Detected scores (edit if needed):</p>';
+            for (let i = 0; i < Math.min(scores.length, 18); i++) {
+                html += `
+                    <div class="score-item">
+                        <span>Hole ${i + 1}:</span>
+                        <input type="number" class="ocr-score-input" data-hole="${i}"
+                               value="${scores[i]}" min="1" max="15"
+                               style="width: 60px; padding: 4px; text-align: center;">
+                    </div>
+                `;
+            }
+            extractedScoresDiv.innerHTML = html;
         }
-
-        html += '<div class="ocr-nine"><strong>Back 9</strong></div>';
-        for (let i = 9; i < 18; i++) {
-            const score = scores[i] || '';
-            html += `
-                <div class="ocr-hole">
-                    <label>Hole ${i + 1}</label>
-                    <input type="number" class="ocr-score-input" data-hole="${i}" value="${score}" min="1" max="15">
-                </div>
-            `;
-        }
-
-        html += '</div>';
-        document.getElementById('extractedScores').innerHTML = html;
     }
 
     applyOcrScores() {
-        const inputs = document.querySelectorAll('.ocr-score-input');
+        const playerIndex = parseInt(document.getElementById('ocrPlayerSelect').value);
+        const scoreInputs = document.querySelectorAll('.ocr-score-input');
 
-        inputs.forEach(input => {
+        const player = this.players[playerIndex];
+        let updatedCount = 0;
+
+        scoreInputs.forEach(input => {
             const hole = parseInt(input.dataset.hole);
-            const value = input.value.trim();
-            this.currentRoundScores[hole] = value ? parseInt(value) : null;
+            const newScore = parseInt(input.value);
+
+            if (newScore >= 1 && newScore <= 15) {
+                const currentScore = player.scores[hole];
+                if (currentScore === null || newScore < currentScore) {
+                    player.scores[hole] = newScore;
+                    updatedCount++;
+                }
+            }
         });
 
+        this.saveData();
+        this.render();
         this.hideOcrModal();
-        this.renderRoundEntry();
+
+        alert(`Updated ${updatedCount} scores for ${player.name}!`);
     }
 
     hideOcrModal() {
@@ -1686,22 +1030,21 @@ class FantasyGolf {
         document.getElementById('scorecardUpload').value = '';
     }
 
-    // ============================================
-    // EXPORT/IMPORT
-    // ============================================
+    // Export/Import functionality
     exportScores() {
         const data = {
-            version: 2,
-            exportDate: new Date().toISOString(),
             players: this.players,
-            parValues: this.parValues
+            parValues: this.parValues,
+            exportedAt: new Date().toISOString()
         };
 
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
+
         const a = document.createElement('a');
         a.href = url;
-        a.download = `fantasy-golf-2026-${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `fantasy-golf-${new Date().toISOString().split('T')[0]}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -1710,31 +1053,42 @@ class FantasyGolf {
 
     importScores(file) {
         const reader = new FileReader();
+
         reader.onload = (e) => {
             try {
                 const data = JSON.parse(e.target.result);
-                if (data.players) {
-                    if (confirm('This will replace all current data. Continue?')) {
-                        this.players = data.players.map(p => this.migratePlayerData(p));
-                        if (data.parValues) {
-                            this.parValues = data.parValues;
-                        }
-                        this.saveData();
-                        this.renderAll();
-                        alert('Data imported successfully!');
+
+                if (!data.players || !Array.isArray(data.players)) {
+                    throw new Error('Invalid file format');
+                }
+
+                for (const player of data.players) {
+                    if (!player.name || !Array.isArray(player.scores) || player.scores.length !== 18) {
+                        throw new Error('Invalid player data');
                     }
-                } else {
-                    alert('Invalid file format');
+                }
+
+                if (confirm(`Import ${data.players.length} player(s)? This will replace your current data.`)) {
+                    this.players = data.players;
+                    if (data.parValues) {
+                        this.parValues = data.parValues;
+                    }
+                    this.saveData();
+                    this.render();
+                    alert('Scores imported successfully!');
                 }
             } catch (error) {
+                alert('Failed to import scores. Please check the file format.');
                 console.error('Import error:', error);
-                alert('Failed to import file. Please check the file format.');
             }
         };
+
         reader.readAsText(file);
         document.getElementById('importUpload').value = '';
     }
 }
 
-// Initialize the app
-const app = new FantasyGolf();
+// Initialize the application when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    window.fantasyGolf = new FantasyGolf();
+});

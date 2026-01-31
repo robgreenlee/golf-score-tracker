@@ -1047,6 +1047,30 @@ footer {
     border-top: 2px solid #eee;
 }
 
+/* Desktop/Mobile Layout Switching */
+.desktop-scorecard {
+    display: block;
+}
+
+.mobile-scorecard {
+    display: none;
+}
+
+/* Mobile scorecard styling */
+.mobile-scorecard .scorecard {
+    min-width: auto;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.mobile-scorecard .scorecard-front {
+    margin-bottom: 15px;
+}
+
+.mobile-scorecard .scorecard-back {
+    border-top: 3px solid #355E3B;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {
@@ -1069,14 +1093,48 @@ footer {
         width: 100%;
     }
 
+    /* Switch to mobile two-row layout */
+    .desktop-scorecard {
+        display: none;
+    }
+
+    .mobile-scorecard {
+        display: block;
+    }
+
     .scorecard th,
     .scorecard td {
-        padding: 8px;
-        font-size: 0.9em;
+        padding: 6px 4px;
+        font-size: 0.85em;
+    }
+
+    .scorecard .player-name {
+        font-size: 0.8em;
+        min-width: 60px;
+        max-width: 80px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .player-name .remove-player {
+        display: none;
     }
 
     .score-input {
-        height: 32px;
-        font-size: 1em;
+        height: 28px;
+        font-size: 0.95em;
+        width: 28px;
+        min-width: 28px;
+    }
+
+    .scorecard .score-cell {
+        padding: 2px;
+    }
+
+    .subtotal-cell,
+    .total-cell {
+        font-size: 0.85em;
+        padding: 4px !important;
     }
 }
