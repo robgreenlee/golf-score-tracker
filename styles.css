@@ -995,6 +995,94 @@ header h2 {
     font-style: italic;
 }
 
+/* Fantasy Player Filter Dropdown */
+.fantasy-player-filter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.fantasy-player-filter label {
+    font-weight: 600;
+    color: #355E3B;
+}
+
+.fantasy-player-filter select {
+    padding: 8px 15px;
+    border: 2px solid #355E3B;
+    border-radius: 6px;
+    font-size: 1em;
+    background: white;
+    color: #333;
+    cursor: pointer;
+    min-width: 150px;
+}
+
+.fantasy-player-filter select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(53, 94, 59, 0.2);
+}
+
+/* Single Player Fantasy View */
+.single-player-fantasy {
+    padding: 10px 0;
+}
+
+.single-player-name {
+    color: #355E3B;
+    margin: 0 0 15px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.single-player-table {
+    width: 100%;
+    margin-bottom: 15px;
+    min-width: auto !important;
+}
+
+.single-player-table .nine-header {
+    background: #355E3B;
+    color: white;
+    text-align: center;
+    font-size: 1em;
+    padding: 8px;
+}
+
+.single-player-summary {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    padding: 15px;
+    background: #e8f5e9;
+    border-radius: 8px;
+    margin: 15px 0;
+}
+
+.single-player-summary .summary-item {
+    font-size: 1.1em;
+}
+
+.single-player-summary .summary-item span {
+    color: #666;
+}
+
+.single-player-summary .summary-item strong {
+    color: #355E3B;
+    font-size: 1.2em;
+}
+
+.btn-sm {
+    padding: 5px 12px;
+    font-size: 0.85em;
+}
+
 .no-kickers {
     color: #666;
     font-style: italic;
@@ -1313,6 +1401,53 @@ footer {
         font-size: 0.8em;
         padding: 0;
         border-width: 1px;
+    }
+
+    /* Single player view on mobile - compact and fits screen */
+    .single-player-fantasy {
+        padding: 5px 0;
+    }
+
+    .single-player-name {
+        font-size: 1.1em;
+        margin-bottom: 10px;
+    }
+
+    .single-player-table {
+        table-layout: fixed;
+        margin-bottom: 10px;
+    }
+
+    .single-player-table .nine-header {
+        font-size: 0.85em;
+        padding: 6px;
+    }
+
+    .single-player-table th,
+    .single-player-table td {
+        padding: 3px 2px;
+        font-size: 0.8em;
+    }
+
+    .single-player-table .score-input {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        font-size: 0.9em;
+    }
+
+    .single-player-summary {
+        gap: 20px;
+        padding: 10px;
+    }
+
+    .fantasy-player-filter {
+        padding: 8px;
+    }
+
+    .fantasy-player-filter select {
+        flex: 1;
+        min-width: 0;
     }
 
     /* Scroll hint for fantasy scorecard */
