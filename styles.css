@@ -1071,6 +1071,65 @@ footer {
     border-top: 3px solid #355E3B;
 }
 
+/* Fantasy Scorecard - Scrollable container with indicators */
+#fantasyScorecardContainer {
+    position: relative;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+/* Scroll shadow indicators */
+#fantasyScorecardContainer::before,
+#fantasyScorecardContainer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+#fantasyScorecardContainer::before {
+    left: 0;
+    background: linear-gradient(to right, rgba(255,255,255,0.9), transparent);
+}
+
+#fantasyScorecardContainer::after {
+    right: 0;
+    background: linear-gradient(to left, rgba(255,255,255,0.9), transparent);
+}
+
+#fantasyScorecardContainer.can-scroll-right::after {
+    opacity: 1;
+}
+
+#fantasyScorecardContainer.can-scroll-left::before {
+    opacity: 1;
+}
+
+/* Sticky player name column for fantasy scorecard */
+.fantasy-scorecard .player-name,
+.fantasy-scorecard th:first-child,
+.fantasy-scorecard .par-row td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: #f8f9fa;
+}
+
+.fantasy-scorecard th:first-child {
+    background: #355E3B;
+    z-index: 3;
+}
+
+.fantasy-scorecard .par-row td:first-child {
+    background: #e8f5e9;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {
@@ -1170,5 +1229,122 @@ footer {
 
     .tab-nav {
         gap: 5px;
+    }
+
+    /* Fantasy scorecard on mobile - scrollable with sticky column */
+    #fantasyScorecardContainer {
+        margin: 0 -15px;
+        padding: 0 15px;
+    }
+
+    .fantasy-scorecard {
+        min-width: 700px;
+    }
+
+    .fantasy-scorecard .player-name {
+        min-width: 50px;
+        max-width: 60px;
+        font-size: 0.7em;
+        padding: 4px 2px;
+        box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+    }
+
+    .fantasy-scorecard th:first-child {
+        min-width: 50px;
+        box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+    }
+
+    .fantasy-scorecard .par-row td:first-child {
+        box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+    }
+
+    .fantasy-scorecard .score-cell.readonly {
+        font-size: 0.65em;
+        padding: 2px 1px;
+        white-space: nowrap;
+    }
+
+    /* Scroll hint for fantasy scorecard */
+    .scroll-hint {
+        text-align: center;
+        color: #666;
+        font-size: 0.8em;
+        padding: 8px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        margin-bottom: 10px;
+    }
+}
+
+/* Landscape orientation - show full scorecard */
+@media (max-width: 900px) and (orientation: landscape) {
+    .container {
+        padding: 10px;
+    }
+
+    header {
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+    }
+
+    header h1 {
+        font-size: 1.4em;
+    }
+
+    header h2 {
+        font-size: 0.9em;
+    }
+
+    .oak-leaf {
+        width: 40px;
+        height: 40px;
+    }
+
+    /* Show desktop layout in landscape */
+    .desktop-scorecard {
+        display: block;
+    }
+
+    .mobile-scorecard {
+        display: none;
+    }
+
+    /* Compact scorecard for landscape */
+    .scorecard th,
+    .scorecard td {
+        padding: 4px 3px;
+        font-size: 0.8em;
+    }
+
+    .score-input {
+        height: 26px;
+        width: 26px;
+        min-width: 26px;
+        font-size: 0.85em;
+    }
+
+    .scorecard .player-name {
+        font-size: 0.75em;
+        min-width: 50px;
+        max-width: 70px;
+    }
+
+    /* Fantasy scorecard in landscape - fits better */
+    .fantasy-scorecard {
+        min-width: auto;
+    }
+
+    .fantasy-scorecard .score-cell.readonly {
+        font-size: 0.75em;
+        padding: 3px 2px;
+    }
+
+    .tab-nav {
+        margin-bottom: 10px;
+    }
+
+    .tab-btn {
+        padding: 6px 15px;
+        font-size: 0.85em;
     }
 }
