@@ -1102,16 +1102,27 @@ footer {
         display: block;
     }
 
+    .mobile-scorecard .scorecard {
+        table-layout: fixed;
+        width: 100%;
+    }
+
     .scorecard th,
     .scorecard td {
-        padding: 6px 4px;
-        font-size: 0.85em;
+        padding: 2px 1px;
+        font-size: 0.75em;
+    }
+
+    /* Hide the first column (Hole/Player label) on mobile to save space */
+    .mobile-scorecard .scorecard th:first-child,
+    .mobile-scorecard .scorecard td:first-child {
+        display: none;
     }
 
     .scorecard .player-name {
-        font-size: 0.8em;
-        min-width: 60px;
-        max-width: 80px;
+        font-size: 0.7em;
+        min-width: 40px;
+        max-width: 50px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1122,19 +1133,42 @@ footer {
     }
 
     .score-input {
-        height: 28px;
-        font-size: 0.95em;
-        width: 28px;
-        min-width: 28px;
+        height: 24px;
+        font-size: 0.85em;
+        width: 24px;
+        min-width: 24px;
+        padding: 0;
     }
 
     .scorecard .score-cell {
-        padding: 2px;
+        padding: 1px;
+    }
+
+    .scorecard .hole-header {
+        font-size: 0.7em;
+        padding: 2px 1px;
     }
 
     .subtotal-cell,
     .total-cell {
+        font-size: 0.75em;
+        padding: 2px !important;
+        min-width: 28px;
+    }
+
+    .subtotal-header,
+    .gross-header {
+        font-size: 0.65em;
+        padding: 2px 1px !important;
+    }
+
+    /* Tab buttons on mobile */
+    .tab-btn {
+        padding: 8px 12px;
         font-size: 0.85em;
-        padding: 4px !important;
+    }
+
+    .tab-nav {
+        gap: 5px;
     }
 }
