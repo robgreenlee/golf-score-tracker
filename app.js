@@ -933,7 +933,9 @@ class FantasyGolf {
         html += '</table>';
         html += '<p class="fantasy-note">Best score per hole from all submitted rounds. Rob\'s pop holes show as "net (gross)".</p>';
 
-        container.innerHTML = html;
+        // Add scroll hint for mobile
+        const scrollHint = '<p class="scroll-hint">← Swipe to see all holes • Rotate phone for full view →</p>';
+        container.innerHTML = scrollHint + html;
 
         // Add remove player listeners
         document.querySelectorAll('#fantasyScorecardContainer .remove-player').forEach(btn => {
@@ -943,6 +945,25 @@ class FantasyGolf {
                 this.removePlayer(playerIndex);
             });
         });
+
+        // Setup scroll indicators
+        this.setupScrollIndicators(container);
+    }
+
+    setupScrollIndicators(container) {
+        const updateScrollIndicators = () => {
+            const canScrollLeft = container.scrollLeft > 0;
+            const canScrollRight = container.scrollLeft < (container.scrollWidth - container.clientWidth - 5);
+
+            container.classList.toggle('can-scroll-left', canScrollLeft);
+            container.classList.toggle('can-scroll-right', canScrollRight);
+        };
+
+        container.addEventListener('scroll', updateScrollIndicators);
+        // Initial check after render
+        setTimeout(updateScrollIndicators, 100);
+        // Check again on resize
+        window.addEventListener('resize', updateScrollIndicators);
     }
 
     renderFantasyScoring() {
