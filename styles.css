@@ -1015,6 +1015,44 @@ header h2 {
     text-align: center;
 }
 
+/* Editable fantasy score cells */
+.score-cell.editable {
+    padding: 2px;
+}
+
+.fantasy-scorecard .score-input {
+    width: 100%;
+    height: 32px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.9em;
+    background: #fff;
+    color: #333;
+    transition: all 0.2s ease;
+}
+
+.fantasy-scorecard .score-input:hover {
+    border-color: #355E3B;
+    background: #f8f9fa;
+}
+
+.fantasy-scorecard .score-input:focus {
+    outline: none;
+    border-color: #355E3B;
+    box-shadow: 0 0 0 2px rgba(53, 94, 59, 0.2);
+}
+
+.fantasy-scorecard .score-input::placeholder {
+    color: #ccc;
+}
+
+.fantasy-scorecard .score-input.rejected {
+    animation: shake 0.3s ease;
+    border-color: #dc3545 !important;
+}
+
 .pop-header {
     background: linear-gradient(180deg, rgba(255, 215, 0, 0.4), rgba(255, 215, 0, 0.2)) !important;
 }
@@ -1264,6 +1302,19 @@ footer {
         white-space: nowrap;
     }
 
+    .fantasy-scorecard .score-cell.editable {
+        padding: 1px;
+    }
+
+    .fantasy-scorecard .score-input {
+        height: 26px;
+        width: 26px;
+        min-width: 26px;
+        font-size: 0.8em;
+        padding: 0;
+        border-width: 1px;
+    }
+
     /* Scroll hint for fantasy scorecard */
     .scroll-hint {
         text-align: center;
@@ -1337,6 +1388,17 @@ footer {
     .fantasy-scorecard .score-cell.readonly {
         font-size: 0.75em;
         padding: 3px 2px;
+    }
+
+    .fantasy-scorecard .score-cell.editable {
+        padding: 2px;
+    }
+
+    .fantasy-scorecard .score-input {
+        height: 24px;
+        width: 28px;
+        min-width: 28px;
+        font-size: 0.8em;
     }
 
     .tab-nav {
