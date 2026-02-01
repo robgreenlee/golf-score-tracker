@@ -920,7 +920,7 @@ class FantasyGolf {
         });
 
         html += '</table>';
-        html += '<p class="fantasy-note">Tap any score to edit. Only better (lower) scores will be saved.</p>';
+        html += '<p class="fantasy-note">Tap any score to edit. Clear a cell to remove the score.</p>';
         return html;
     }
 
@@ -1035,7 +1035,7 @@ class FantasyGolf {
         html += `<div class="summary-item"><span>Net:</span> <strong>${netTotal !== null ? netTotal : '—'}</strong></div>`;
         html += '</div>';
 
-        html += '<p class="fantasy-note">Tap any score to edit. Only better (lower) scores will be saved.</p>';
+        html += '<p class="fantasy-note">Tap any score to edit. Clear a cell to remove the score.</p>';
         html += '</div>';
         return html;
     }
@@ -1141,9 +1141,14 @@ class FantasyGolf {
         const player = this.players[playerIndex];
         const currentScore = player.scores[hole];
 
-        // If empty, don't change anything (can't clear a best score)
+        // If empty, clear the score
         if (newValue === '') {
-            input.value = currentScore !== null ? currentScore : '';
+            if (currentScore !== null) {
+                player.scores[hole] = null;
+                this.saveData();
+                this.updateFantasyRowTotals(playerIndex);
+                this.renderFantasyScoring();
+            }
             return;
         }
 
@@ -1157,32 +1162,25 @@ class FantasyGolf {
             return;
         }
 
-        // Only update if it's a new score or better than current best
-        if (currentScore === null || newScore <= currentScore) {
-            player.scores[hole] = newScore;
-            this.saveData();
+        // Update the score
+        player.scores[hole] = newScore;
+        this.saveData();
 
-            // Update the cell's par class
-            const cell = input.closest('.score-cell');
-            if (cell) {
-                cell.classList.remove('birdie', 'eagle', 'bogey', 'double-bogey');
-                const parClass = this.getParClass(newScore, this.parValues[hole], player.name, hole);
-                if (parClass) {
-                    cell.classList.add(parClass);
-                }
+        // Update the cell's par class
+        const cell = input.closest('.score-cell');
+        if (cell) {
+            cell.classList.remove('birdie', 'eagle', 'bogey', 'double-bogey');
+            const parClass = this.getParClass(newScore, this.parValues[hole], player.name, hole);
+            if (parClass) {
+                cell.classList.add(parClass);
             }
-
-            // Update row totals
-            this.updateFantasyRowTotals(playerIndex);
-
-            // Also update the fantasy scoring section
-            this.renderFantasyScoring();
-        } else {
-            // Score is worse - show feedback and revert
-            input.value = currentScore;
-            input.classList.add('rejected');
-            setTimeout(() => input.classList.remove('rejected'), 300);
         }
+
+        // Update row totals
+        this.updateFantasyRowTotals(playerIndex);
+
+        // Also update the fantasy scoring section
+        this.renderFantasyScoring();
     }
 
     updateFantasyRowTotals(playerIndex) {
