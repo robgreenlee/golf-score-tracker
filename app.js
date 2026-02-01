@@ -28,6 +28,9 @@ class FantasyGolf {
         // Current round being entered (temporary, not saved until submission)
         this.currentRoundScores = Array(18).fill(null);
 
+        // Fantasy scores player filter (null = all players, number = specific player index)
+        this.fantasyPlayerFilter = null;
+
         // Player-specific configuration for handicap (pops) and personal bests
         this.playerConfig = {
             'Rob': {
@@ -827,7 +830,55 @@ class FantasyGolf {
             return;
         }
 
-        let html = '<table class="scorecard fantasy-scorecard">';
+        // Build player dropdown
+        let html = '<div class="fantasy-player-filter">';
+        html += '<label for="fantasyPlayerSelect">View: </label>';
+        html += '<select id="fantasyPlayerSelect">';
+        html += '<option value="all">All Players</option>';
+        this.players.forEach((player, idx) => {
+            const selected = this.fantasyPlayerFilter === idx ? 'selected' : '';
+            html += `<option value="${idx}" ${selected}>${player.name}</option>`;
+        });
+        html += '</select></div>';
+
+        // Check if single player is selected
+        if (this.fantasyPlayerFilter !== undefined && this.fantasyPlayerFilter !== 'all' && this.fantasyPlayerFilter !== null) {
+            html += this.renderSinglePlayerFantasy(this.fantasyPlayerFilter);
+        } else {
+            html += this.renderAllPlayersFantasy();
+        }
+
+        container.innerHTML = html;
+
+        // Setup player filter dropdown
+        document.getElementById('fantasyPlayerSelect').addEventListener('change', (e) => {
+            const value = e.target.value;
+            this.fantasyPlayerFilter = value === 'all' ? null : parseInt(value);
+            this.renderFantasyScorecard();
+            this.renderFantasyScoring();
+        });
+
+        // Add remove player listeners
+        document.querySelectorAll('#fantasyScorecardContainer .remove-player').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const playerIndex = parseInt(e.target.dataset.player);
+                this.removePlayer(playerIndex);
+            });
+        });
+
+        // Setup fantasy score input listeners
+        this.setupFantasyScoreListeners();
+
+        // Setup scroll indicators (only for all-players view)
+        if (this.fantasyPlayerFilter === null || this.fantasyPlayerFilter === undefined) {
+            this.setupScrollIndicators(container);
+        }
+    }
+
+    renderAllPlayersFantasy() {
+        let html = '<p class="scroll-hint">← Swipe to see all holes • Rotate phone for full view →</p>';
+        html += '<table class="scorecard fantasy-scorecard">';
 
         // Header row
         html += '<tr>';
@@ -865,92 +916,195 @@ class FantasyGolf {
 
         // Player rows (editable)
         this.players.forEach((player, playerIndex) => {
-            html += `<tr class="fantasy-player-row" data-player="${playerIndex}">`;
-            html += `<td class="player-name">
-                ${player.name}
-                <button class="remove-player" data-player="${playerIndex}">✕</button>
-            </td>`;
-
-            let front9Total = 0, front9Count = 0;
-            let back9Total = 0, back9Count = 0;
-
-            // Front 9
-            for (let hole = 0; hole < 9; hole++) {
-                const score = player.scores[hole];
-                const isPopHole = this.isPopHole(player.name, hole);
-                const netScore = this.getNetScore(player.name, hole, score);
-
-                if (score !== null) {
-                    front9Total += netScore;
-                    front9Count++;
-                }
-
-                const parClass = this.getParClass(score, this.parValues[hole], player.name, hole);
-                const popClass = isPopHole ? 'pop-hole' : '';
-                html += `<td class="score-cell editable ${parClass} ${popClass}" data-player="${playerIndex}" data-hole="${hole}">
-                    <input type="text" class="score-input fantasy-score-input"
-                           data-player="${playerIndex}" data-hole="${hole}"
-                           value="${score !== null ? score : ''}"
-                           maxlength="2" inputmode="numeric" pattern="[0-9]*"
-                           placeholder="—">
-                </td>`;
-            }
-
-            html += `<td class="subtotal-cell f9-total">${front9Count > 0 ? front9Total : '—'}</td>`;
-
-            // Back 9
-            for (let hole = 9; hole < 18; hole++) {
-                const score = player.scores[hole];
-                const isPopHole = this.isPopHole(player.name, hole);
-                const netScore = this.getNetScore(player.name, hole, score);
-
-                if (score !== null) {
-                    back9Total += netScore;
-                    back9Count++;
-                }
-
-                const parClass = this.getParClass(score, this.parValues[hole], player.name, hole);
-                const popClass = isPopHole ? 'pop-hole' : '';
-                html += `<td class="score-cell editable ${parClass} ${popClass}" data-player="${playerIndex}" data-hole="${hole}">
-                    <input type="text" class="score-input fantasy-score-input"
-                           data-player="${playerIndex}" data-hole="${hole}"
-                           value="${score !== null ? score : ''}"
-                           maxlength="2" inputmode="numeric" pattern="[0-9]*"
-                           placeholder="—">
-                </td>`;
-            }
-
-            html += `<td class="subtotal-cell b9-total">${back9Count > 0 ? back9Total : '—'}</td>`;
-
-            // Totals
-            const grossTotal = this.calculateGrossTotal(player);
-            const netTotal = this.calculateTotal(player);
-            html += `<td class="total-cell gross-total">${grossTotal !== null ? grossTotal : '—'}</td>`;
-            html += `<td class="total-cell net-total">${netTotal !== null ? netTotal : '—'}</td>`;
-            html += '</tr>';
+            html += this.renderFantasyPlayerRow(player, playerIndex);
         });
 
         html += '</table>';
-        html += '<p class="fantasy-note">Tap any score to edit. Only better (lower) scores will be saved. Rob\'s pop holes show net score.</p>';
+        html += '<p class="fantasy-note">Tap any score to edit. Only better (lower) scores will be saved.</p>';
+        return html;
+    }
 
-        // Add scroll hint for mobile
-        const scrollHint = '<p class="scroll-hint">← Swipe to see all holes • Rotate phone for full view →</p>';
-        container.innerHTML = scrollHint + html;
+    renderSinglePlayerFantasy(playerIndex) {
+        const player = this.players[playerIndex];
+        if (!player) return '<p class="no-data">Player not found.</p>';
 
-        // Add remove player listeners
-        document.querySelectorAll('#fantasyScorecardContainer .remove-player').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const playerIndex = parseInt(e.target.dataset.player);
-                this.removePlayer(playerIndex);
-            });
-        });
+        let frontPar = 0, backPar = 0;
+        for (let i = 0; i < 9; i++) frontPar += this.parValues[i];
+        for (let i = 9; i < 18; i++) backPar += this.parValues[i];
+        const totalPar = frontPar + backPar;
 
-        // Setup fantasy score input listeners
-        this.setupFantasyScoreListeners();
+        // Calculate totals
+        let front9Total = 0, front9Count = 0;
+        let back9Total = 0, back9Count = 0;
+        for (let hole = 0; hole < 9; hole++) {
+            const score = player.scores[hole];
+            if (score !== null) {
+                front9Total += this.getNetScore(player.name, hole, score);
+                front9Count++;
+            }
+        }
+        for (let hole = 9; hole < 18; hole++) {
+            const score = player.scores[hole];
+            if (score !== null) {
+                back9Total += this.getNetScore(player.name, hole, score);
+                back9Count++;
+            }
+        }
+        const grossTotal = this.calculateGrossTotal(player);
+        const netTotal = this.calculateTotal(player);
 
-        // Setup scroll indicators
-        this.setupScrollIndicators(container);
+        let html = '<div class="single-player-fantasy">';
+        html += `<h3 class="single-player-name">${player.name} <button class="remove-player btn-sm btn-danger" data-player="${playerIndex}">Remove</button></h3>`;
+
+        // Front 9 Table
+        html += '<table class="scorecard fantasy-scorecard single-player-table">';
+        html += '<tr><th colspan="10" class="nine-header">Front 9</th></tr>';
+        html += '<tr>';
+        for (let i = 1; i <= 9; i++) {
+            const isPopHole = this.isPopHole(player.name, i - 1);
+            html += `<th class="hole-header ${isPopHole ? 'pop-header' : ''}">${i}${isPopHole ? '*' : ''}</th>`;
+        }
+        html += '<th class="subtotal-header">F9</th></tr>';
+
+        // Par row
+        html += '<tr class="par-row">';
+        for (let i = 0; i < 9; i++) {
+            html += `<td>${this.parValues[i]}</td>`;
+        }
+        html += `<td class="subtotal-cell">${frontPar}</td></tr>`;
+
+        // Score row
+        html += `<tr class="fantasy-player-row" data-player="${playerIndex}">`;
+        for (let hole = 0; hole < 9; hole++) {
+            const score = player.scores[hole];
+            const isPopHole = this.isPopHole(player.name, hole);
+            const parClass = this.getParClass(score, this.parValues[hole], player.name, hole);
+            const popClass = isPopHole ? 'pop-hole' : '';
+            html += `<td class="score-cell editable ${parClass} ${popClass}" data-player="${playerIndex}" data-hole="${hole}">
+                <input type="text" class="score-input fantasy-score-input"
+                       data-player="${playerIndex}" data-hole="${hole}"
+                       value="${score !== null ? score : ''}"
+                       maxlength="2" inputmode="numeric" pattern="[0-9]*"
+                       placeholder="—">
+            </td>`;
+        }
+        html += `<td class="subtotal-cell f9-total">${front9Count > 0 ? front9Total : '—'}</td></tr>`;
+        html += '</table>';
+
+        // Back 9 Table
+        html += '<table class="scorecard fantasy-scorecard single-player-table">';
+        html += '<tr><th colspan="11" class="nine-header">Back 9</th></tr>';
+        html += '<tr>';
+        for (let i = 10; i <= 18; i++) {
+            const isPopHole = this.isPopHole(player.name, i - 1);
+            html += `<th class="hole-header ${isPopHole ? 'pop-header' : ''}">${i}${isPopHole ? '*' : ''}</th>`;
+        }
+        html += '<th class="subtotal-header">B9</th>';
+        html += '<th class="gross-header">Tot</th></tr>';
+
+        // Par row
+        html += '<tr class="par-row">';
+        for (let i = 9; i < 18; i++) {
+            html += `<td>${this.parValues[i]}</td>`;
+        }
+        html += `<td class="subtotal-cell">${backPar}</td>`;
+        html += `<td><strong>${totalPar}</strong></td></tr>`;
+
+        // Score row
+        html += `<tr class="fantasy-player-row" data-player="${playerIndex}">`;
+        for (let hole = 9; hole < 18; hole++) {
+            const score = player.scores[hole];
+            const isPopHole = this.isPopHole(player.name, hole);
+            const parClass = this.getParClass(score, this.parValues[hole], player.name, hole);
+            const popClass = isPopHole ? 'pop-hole' : '';
+            html += `<td class="score-cell editable ${parClass} ${popClass}" data-player="${playerIndex}" data-hole="${hole}">
+                <input type="text" class="score-input fantasy-score-input"
+                       data-player="${playerIndex}" data-hole="${hole}"
+                       value="${score !== null ? score : ''}"
+                       maxlength="2" inputmode="numeric" pattern="[0-9]*"
+                       placeholder="—">
+            </td>`;
+        }
+        html += `<td class="subtotal-cell b9-total">${back9Count > 0 ? back9Total : '—'}</td>`;
+        html += `<td class="total-cell net-total">${netTotal !== null ? netTotal : '—'}</td></tr>`;
+        html += '</table>';
+
+        // Summary
+        html += '<div class="single-player-summary">';
+        html += `<div class="summary-item"><span>Gross:</span> <strong>${grossTotal !== null ? grossTotal : '—'}</strong></div>`;
+        html += `<div class="summary-item"><span>Net:</span> <strong>${netTotal !== null ? netTotal : '—'}</strong></div>`;
+        html += '</div>';
+
+        html += '<p class="fantasy-note">Tap any score to edit. Only better (lower) scores will be saved.</p>';
+        html += '</div>';
+        return html;
+    }
+
+    renderFantasyPlayerRow(player, playerIndex) {
+        let html = `<tr class="fantasy-player-row" data-player="${playerIndex}">`;
+        html += `<td class="player-name">
+            ${player.name}
+            <button class="remove-player" data-player="${playerIndex}">✕</button>
+        </td>`;
+
+        let front9Total = 0, front9Count = 0;
+        let back9Total = 0, back9Count = 0;
+
+        // Front 9
+        for (let hole = 0; hole < 9; hole++) {
+            const score = player.scores[hole];
+            const isPopHole = this.isPopHole(player.name, hole);
+            const netScore = this.getNetScore(player.name, hole, score);
+
+            if (score !== null) {
+                front9Total += netScore;
+                front9Count++;
+            }
+
+            const parClass = this.getParClass(score, this.parValues[hole], player.name, hole);
+            const popClass = isPopHole ? 'pop-hole' : '';
+            html += `<td class="score-cell editable ${parClass} ${popClass}" data-player="${playerIndex}" data-hole="${hole}">
+                <input type="text" class="score-input fantasy-score-input"
+                       data-player="${playerIndex}" data-hole="${hole}"
+                       value="${score !== null ? score : ''}"
+                       maxlength="2" inputmode="numeric" pattern="[0-9]*"
+                       placeholder="—">
+            </td>`;
+        }
+
+        html += `<td class="subtotal-cell f9-total">${front9Count > 0 ? front9Total : '—'}</td>`;
+
+        // Back 9
+        for (let hole = 9; hole < 18; hole++) {
+            const score = player.scores[hole];
+            const isPopHole = this.isPopHole(player.name, hole);
+            const netScore = this.getNetScore(player.name, hole, score);
+
+            if (score !== null) {
+                back9Total += netScore;
+                back9Count++;
+            }
+
+            const parClass = this.getParClass(score, this.parValues[hole], player.name, hole);
+            const popClass = isPopHole ? 'pop-hole' : '';
+            html += `<td class="score-cell editable ${parClass} ${popClass}" data-player="${playerIndex}" data-hole="${hole}">
+                <input type="text" class="score-input fantasy-score-input"
+                       data-player="${playerIndex}" data-hole="${hole}"
+                       value="${score !== null ? score : ''}"
+                       maxlength="2" inputmode="numeric" pattern="[0-9]*"
+                       placeholder="—">
+            </td>`;
+        }
+
+        html += `<td class="subtotal-cell b9-total">${back9Count > 0 ? back9Total : '—'}</td>`;
+
+        // Totals
+        const grossTotal = this.calculateGrossTotal(player);
+        const netTotal = this.calculateTotal(player);
+        html += `<td class="total-cell gross-total">${grossTotal !== null ? grossTotal : '—'}</td>`;
+        html += `<td class="total-cell net-total">${netTotal !== null ? netTotal : '—'}</td>`;
+        html += '</tr>';
+        return html;
     }
 
     setupFantasyScoreListeners() {
