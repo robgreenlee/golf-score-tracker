@@ -1900,74 +1900,266 @@ class FantasyGolf {
     extractScoresFromText(text) {
         console.log('OCR Raw Text:', text);
 
-        const allMatches = text.match(/\b\d+\b/g);
-        if (!allMatches) {
-            console.log('No numbers found in OCR text');
-            return [];
+        // Strategy 1: GHIN App format - look for structured rows
+        const ghinScores = this.extractGHINFormat(text);
+        if (ghinScores.length >= 9) {
+            console.log('GHIN format extraction succeeded:', ghinScores);
+            return ghinScores;
         }
 
-        const numbers = allMatches.map(n => parseInt(n));
-        console.log('All numbers found:', numbers);
-
-        const scores = this.extractByAnchorPattern(numbers);
-        if (scores.length >= 9) {
-            console.log('Anchor strategy succeeded:', scores);
-            return scores;
+        // Strategy 2: Look for "Out" and "In" markers
+        const markerScores = this.extractByOutInMarkers(text);
+        if (markerScores.length >= 9) {
+            console.log('Out/In marker extraction succeeded:', markerScores);
+            return markerScores;
         }
 
+        // Strategy 3: Line-by-line analysis
         const lineScores = this.extractByLineAnalysis(text);
         if (lineScores.length >= 9) {
             console.log('Line analysis succeeded:', lineScores);
             return lineScores;
         }
 
-        const groupScores = this.extractByFiltering(numbers);
-        if (groupScores.length >= 9) {
-            console.log('Filtering strategy succeeded:', groupScores);
-            return groupScores;
-        }
+        // Strategy 4: Anchor pattern (1-9, 10-18 sequences)
+        const allMatches = text.match(/\b\d+\b/g);
+        if (allMatches) {
+            const numbers = allMatches.map(n => parseInt(n));
+            console.log('All numbers found:', numbers);
 
-        console.log('All strategies failed, returning filtered numbers');
-        return numbers.filter(n => n >= 1 && n <= 12).slice(0, 18);
-    }
+            const anchorScores = this.extractByAnchorPattern(numbers);
+            if (anchorScores.length >= 9) {
+                console.log('Anchor pattern succeeded:', anchorScores);
+                return anchorScores;
+            }
 
-    extractByAnchorPattern(numbers) {
-        let front9Anchor = -1;
-        for (let i = 0; i <= numbers.length - 9; i++) {
-            const slice = numbers.slice(i, i + 9);
-            if (slice[0] === 1 && slice[8] === 9 && slice.every((n, idx) => n === idx + 1)) {
-                front9Anchor = i;
-                break;
+            // Strategy 5: Simple filtering
+            const filteredScores = this.extractByFiltering(numbers);
+            if (filteredScores.length >= 9) {
+                console.log('Filtering succeeded:', filteredScores);
+                return filteredScores;
             }
         }
 
+        console.log('All OCR strategies failed');
+        return [];
+    }
+
+    extractGHINFormat(text) {
+        // GHIN app format has clear row structure:
+        // Row: 1 2 3 4 5 6 7 8 9 Out
+        // Row: par par par par par par par par par total
+        // Row: score score score score score score score score score total
+
+        const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+        console.log('Lines for GHIN parsing:', lines);
+
+        const scores = [];
+        let foundFront9 = false;
+        let foundBack9 = false;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const nums = line.match(/\b\d+\b/g);
+            if (!nums) continue;
+
+            const numbers = nums.map(n => parseInt(n));
+
+            // Check if this line contains hole numbers 1-9
+            if (!foundFront9 && this.isHoleNumberRow(numbers, 1, 9)) {
+                // Look for scores in the next 2-3 lines (skip par row)
+                for (let j = i + 1; j <= Math.min(i + 3, lines.length - 1); j++) {
+                    const scoreLine = lines[j];
+                    const scoreNums = scoreLine.match(/\b\d+\b/g);
+                    if (scoreNums) {
+                        const potentialScores = scoreNums.map(n => parseInt(n));
+                        const validScores = this.extractValidScoreRow(potentialScores, 9);
+                        if (validScores) {
+                            scores.push(...validScores);
+                            foundFront9 = true;
+                            console.log('Found Front 9 scores:', validScores);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Check if this line contains hole numbers 10-18
+            if (foundFront9 && !foundBack9 && this.isHoleNumberRow(numbers, 10, 18)) {
+                // Look for scores in the next 2-3 lines
+                for (let j = i + 1; j <= Math.min(i + 3, lines.length - 1); j++) {
+                    const scoreLine = lines[j];
+                    const scoreNums = scoreLine.match(/\b\d+\b/g);
+                    if (scoreNums) {
+                        const potentialScores = scoreNums.map(n => parseInt(n));
+                        const validScores = this.extractValidScoreRow(potentialScores, 9);
+                        if (validScores) {
+                            scores.push(...validScores);
+                            foundBack9 = true;
+                            console.log('Found Back 9 scores:', validScores);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        return scores;
+    }
+
+    isHoleNumberRow(numbers, start, end) {
+        // Check if this row contains sequential hole numbers
+        const expected = [];
+        for (let i = start; i <= end; i++) expected.push(i);
+
+        // Allow for some OCR errors - at least 7 of 9 should match
+        let matches = 0;
+        for (const exp of expected) {
+            if (numbers.includes(exp)) matches++;
+        }
+        return matches >= 7;
+    }
+
+    extractValidScoreRow(numbers, expectedCount) {
+        // Filter to valid golf scores (1-15, but typically 2-10)
+        const validScores = numbers.filter(n => n >= 1 && n <= 15);
+
+        // Skip if this looks like a par row (all numbers 3-5)
+        if (validScores.length >= expectedCount) {
+            const firstN = validScores.slice(0, expectedCount);
+            const allPars = firstN.every(n => n >= 3 && n <= 5);
+            if (allPars) {
+                // Check sum - par rows sum to ~35-36 for 9 holes
+                const sum = firstN.reduce((a, b) => a + b, 0);
+                if (sum >= 34 && sum <= 37) {
+                    return null; // This is a par row, skip it
+                }
+            }
+
+            // Check if this is a valid score row
+            const sum = firstN.reduce((a, b) => a + b, 0);
+            // Valid 9-hole scores typically range from 30-60+
+            if (sum >= 28 && sum <= 70) {
+                return firstN;
+            }
+        }
+
+        return null;
+    }
+
+    extractByOutInMarkers(text) {
+        // Look for lines containing "Out" or "In" followed by a total
+        const scores = [];
+        const lines = text.split('\n').map(line => line.trim());
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].toLowerCase();
+
+            // Look for "out" marker (front 9 total)
+            if ((line.includes('out') || line.includes('0ut')) && scores.length === 0) {
+                // Extract numbers from this line
+                const nums = lines[i].match(/\b\d+\b/g);
+                if (nums && nums.length >= 9) {
+                    const numbers = nums.map(n => parseInt(n));
+                    const validScores = numbers.filter(n => n >= 1 && n <= 15);
+                    if (validScores.length >= 9) {
+                        const front9 = validScores.slice(0, 9);
+                        const sum = front9.reduce((a, b) => a + b, 0);
+                        if (sum >= 28 && sum <= 70) {
+                            scores.push(...front9);
+                            console.log('Found Front 9 via Out marker:', front9);
+                        }
+                    }
+                }
+            }
+
+            // Look for "in" marker (back 9 total)
+            if ((line.includes(' in') || line.endsWith('in')) && scores.length === 9) {
+                const nums = lines[i].match(/\b\d+\b/g);
+                if (nums && nums.length >= 9) {
+                    const numbers = nums.map(n => parseInt(n));
+                    const validScores = numbers.filter(n => n >= 1 && n <= 15);
+                    if (validScores.length >= 9) {
+                        const back9 = validScores.slice(0, 9);
+                        const sum = back9.reduce((a, b) => a + b, 0);
+                        if (sum >= 28 && sum <= 70) {
+                            scores.push(...back9);
+                            console.log('Found Back 9 via In marker:', back9);
+                        }
+                    }
+                }
+            }
+        }
+
+        return scores;
+    }
+
+    extractByAnchorPattern(numbers) {
+        // Find the sequence 1-9 for front 9
+        let front9Anchor = -1;
+        for (let i = 0; i <= numbers.length - 9; i++) {
+            const slice = numbers.slice(i, i + 9);
+            if (slice[0] === 1 && slice[8] === 9) {
+                let sequential = 0;
+                for (let j = 0; j < 9; j++) {
+                    if (slice[j] === j + 1) sequential++;
+                }
+                if (sequential >= 7) {
+                    front9Anchor = i;
+                    break;
+                }
+            }
+        }
+
+        // Find the sequence 10-18 for back 9
         let back9Anchor = -1;
         for (let i = 0; i <= numbers.length - 9; i++) {
             const slice = numbers.slice(i, i + 9);
             if (slice[0] === 10 && slice[8] === 18) {
-                back9Anchor = i;
-                break;
+                let sequential = 0;
+                for (let j = 0; j < 9; j++) {
+                    if (slice[j] === j + 10) sequential++;
+                }
+                if (sequential >= 7) {
+                    back9Anchor = i;
+                    break;
+                }
             }
         }
 
         const scores = [];
 
         if (front9Anchor !== -1) {
-            const scoresStart = front9Anchor + 19;
-            if (scoresStart + 9 <= numbers.length) {
-                const front9Scores = numbers.slice(scoresStart, scoresStart + 9);
-                if (front9Scores.every(s => s >= 1 && s <= 15)) {
-                    scores.push(...front9Scores);
+            // After hole numbers, skip par row (9 nums + 1 total = 10), then scores
+            // Try different offsets to find valid scores
+            for (let offset = 10; offset <= 20; offset++) {
+                const scoresStart = front9Anchor + offset;
+                if (scoresStart + 9 <= numbers.length) {
+                    const front9Scores = numbers.slice(scoresStart, scoresStart + 9);
+                    if (front9Scores.every(s => s >= 1 && s <= 15)) {
+                        const sum = front9Scores.reduce((a, b) => a + b, 0);
+                        // Skip if this looks like par row
+                        if (sum >= 28 && sum <= 70 && !front9Scores.every(s => s >= 3 && s <= 5)) {
+                            scores.push(...front9Scores);
+                            break;
+                        }
+                    }
                 }
             }
         }
 
         if (scores.length === 9 && back9Anchor !== -1) {
-            const scoresStart = back9Anchor + 19;
-            if (scoresStart + 9 <= numbers.length) {
-                const back9Scores = numbers.slice(scoresStart, scoresStart + 9);
-                if (back9Scores.every(s => s >= 1 && s <= 15)) {
-                    scores.push(...back9Scores);
+            for (let offset = 10; offset <= 20; offset++) {
+                const scoresStart = back9Anchor + offset;
+                if (scoresStart + 9 <= numbers.length) {
+                    const back9Scores = numbers.slice(scoresStart, scoresStart + 9);
+                    if (back9Scores.every(s => s >= 1 && s <= 15)) {
+                        const sum = back9Scores.reduce((a, b) => a + b, 0);
+                        if (sum >= 28 && sum <= 70 && !back9Scores.every(s => s >= 3 && s <= 5)) {
+                            scores.push(...back9Scores);
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -1978,20 +2170,49 @@ class FantasyGolf {
     extractByLineAnalysis(text) {
         const lines = text.split('\n').map(line => line.trim()).filter(line => line);
         const scores = [];
+        const candidateRows = [];
 
+        // First pass: identify all candidate score rows
         for (const line of lines) {
             const nums = line.match(/\b\d+\b/g);
             if (nums && nums.length >= 9) {
                 const lineNumbers = nums.map(n => parseInt(n));
-                const validScores = lineNumbers.filter(n => n >= 2 && n <= 12);
-                if (validScores.length >= 9 && validScores.length <= 10) {
-                    const total = validScores.reduce((a, b) => a + b, 0);
-                    if (total >= 30 && total <= 65) {
-                        scores.push(...validScores.slice(0, 9));
-                        if (scores.length >= 18) break;
+                const validScores = lineNumbers.filter(n => n >= 1 && n <= 15);
+
+                if (validScores.length >= 9) {
+                    const first9 = validScores.slice(0, 9);
+                    const total = first9.reduce((a, b) => a + b, 0);
+
+                    // Skip hole number rows (1-9 or 10-18 sequential)
+                    if (this.isHoleNumberRow(first9, 1, 9) || this.isHoleNumberRow(first9, 10, 18)) {
+                        continue;
+                    }
+
+                    // Skip par rows (all 3-5, sum 34-37)
+                    if (first9.every(n => n >= 3 && n <= 5) && total >= 34 && total <= 37) {
+                        continue;
+                    }
+
+                    // This could be a score row
+                    if (total >= 28 && total <= 70) {
+                        candidateRows.push({
+                            scores: first9,
+                            total: total,
+                            line: line
+                        });
                     }
                 }
             }
+        }
+
+        console.log('Candidate score rows:', candidateRows);
+
+        // Take the best candidate rows (typically 2 for front and back 9)
+        if (candidateRows.length >= 1) {
+            scores.push(...candidateRows[0].scores);
+        }
+        if (candidateRows.length >= 2) {
+            scores.push(...candidateRows[1].scores);
         }
 
         return scores;
