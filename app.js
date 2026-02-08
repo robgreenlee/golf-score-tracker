@@ -3,7 +3,7 @@
 
 // Firebase Configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyD0FJMW81tgz65zuU7N5fOcRstF1tJKhN0",
+    apiKey: "AIzaSyAYlxncw1dcHFj5M2z1tkx-XYv9o8i7HqI",
     authDomain: "fantasy-golf-71ebf.firebaseapp.com",
     databaseURL: "https://fantasy-golf-71ebf-default-rtdb.firebaseio.com",
     projectId: "fantasy-golf-71ebf",
