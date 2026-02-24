@@ -13,7 +13,14 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-firebase.initializeApp(firebaseConfig);
+let firebaseInitError = null;
+try {
+    firebase.initializeApp(firebaseConfig);
+    console.log('Firebase initialized successfully');
+} catch (e) {
+    firebaseInitError = e;
+    console.error('Firebase initialization error:', e);
+}
 const database = firebase.database();
 
 class FantasyGolf {
@@ -81,16 +88,30 @@ class FantasyGolf {
 
     // Firebase Setup and Sync
     setupFirebase() {
+        if (firebaseInitError) {
+            console.error('Skipping Firebase setup due to init error');
+            this.loadFromLocalStorage();
+            this.renderAll();
+            this.updateSyncStatus('offline');
+            return;
+        }
+
         const dataRef = database.ref('golfData');
+        console.log('Setting up Firebase listeners...');
 
         // Listen for connection state
         database.ref('.info/connected').on('value', (snapshot) => {
             this.isOnline = snapshot.val() === true;
+            console.log('Firebase connection state:', this.isOnline ? 'online' : 'offline');
             this.updateSyncStatus();
+        }, (error) => {
+            console.error('Firebase connection listener error:', error);
+            this.updateSyncStatus('offline');
         });
 
         // Listen for data changes (real-time sync)
         dataRef.on('value', (snapshot) => {
+            console.log('Firebase data received');
             const data = snapshot.val();
             if (data && data.players) {
                 this.players = this.convertFromFirebase(data.players);
@@ -101,6 +122,7 @@ class FantasyGolf {
                 this.renderAll();
                 this.updateSyncStatus('synced');
             } else {
+                console.log('No data in Firebase, loading from localStorage');
                 this.loadFromLocalStorage();
                 this.renderAll();
                 if (this.players.length > 0) {
@@ -108,7 +130,7 @@ class FantasyGolf {
                 }
             }
         }, (error) => {
-            console.error('Firebase read error:', error);
+            console.error('Firebase read error:', error.code, error.message);
             this.loadFromLocalStorage();
             this.renderAll();
             this.updateSyncStatus('offline');
