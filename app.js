@@ -1,6 +1,18 @@
 // Fantasy Golf 2026 - Main Application with Firebase Sync
 // RESTRUCTURED: Primary flow is Enter Round → Submit → Updates Fantasy Scores
 
+// Debug overlay for mobile
+const debugLog = (() => {
+    const el = document.createElement('div');
+    el.id = 'debugOverlay';
+    el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;max-height:40vh;overflow-y:auto;background:#111;color:#0f0;font:11px/1.4 monospace;padding:8px;z-index:99999;white-space:pre-wrap;';
+    document.addEventListener('DOMContentLoaded', () => document.body.appendChild(el));
+    return (msg) => {
+        const time = new Date().toLocaleTimeString();
+        el.textContent = `[${time}] ${msg}\n` + el.textContent;
+    };
+})();
+
 // Firebase Configuration
 const firebaseConfig = {
     apiKey: "AIzaSyAYlxncw1dcHFj5M2z1tkx-XYv9o8i7HqI",
@@ -86,12 +98,15 @@ class FantasyGolf {
         // Listen for connection state
         database.ref('.info/connected').on('value', (snapshot) => {
             this.isOnline = snapshot.val() === true;
+            debugLog(`CONNECTION: ${this.isOnline ? 'ONLINE' : 'OFFLINE'}`);
             this.updateSyncStatus();
         });
 
         // Listen for data changes (real-time sync)
+        debugLog('Setting up Firebase listener on golfData...');
         dataRef.on('value', (snapshot) => {
             const data = snapshot.val();
+            debugLog(`READ OK: got data, players=${data?.players ? Object.keys(data.players).length : 'none'}`);
             if (data && data.players) {
                 this.players = this.convertFromFirebase(data.players);
                 if (data.parValues) {
@@ -101,6 +116,7 @@ class FantasyGolf {
                 this.renderAll();
                 this.updateSyncStatus('synced');
             } else {
+                debugLog('READ: no player data found, loading from localStorage');
                 this.loadFromLocalStorage();
                 this.renderAll();
                 if (this.players.length > 0) {
@@ -108,6 +124,7 @@ class FantasyGolf {
                 }
             }
         }, (error) => {
+            debugLog(`READ ERROR: ${error.code} - ${error.message}`);
             console.error('Firebase read error:', error);
             this.loadFromLocalStorage();
             this.renderAll();
@@ -209,11 +226,14 @@ class FantasyGolf {
             lastUpdated: Date.now()
         };
 
+        debugLog(`WRITE: attempting set() with ${Object.keys(data).join(', ')}`);
         database.ref('golfData').set(data)
             .then(() => {
+                debugLog('WRITE OK: data saved to Firebase');
                 this.updateSyncStatus('synced');
             })
             .catch((error) => {
+                debugLog(`WRITE ERROR: ${error.code} - ${error.message}`);
                 console.error('Firebase write error:', error);
                 this.updateSyncStatus('offline');
             });
