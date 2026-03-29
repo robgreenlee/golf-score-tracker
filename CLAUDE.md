@@ -23,6 +23,7 @@ Single class managing the entire application with these key responsibilities:
 1. **Data Model**: Players array with `{name: string, scores: number[]}` where -1 represents no score
 2. **Dual Storage**: localStorage for offline capability + Firebase Realtime Database for cloud sync
 3. **Rendering**: Dynamic HTML table with inline editing, keyboard navigation, and running totals
+4. **Round Entry**: Manual score entry per hole with auto-advance, keyboard navigation, and round submission with kicker detection
 
 ### Data Flow
 ```
@@ -36,10 +37,7 @@ User Input → Event Listener → saveInlineScore() → saveData() →
 
 **Firebase Sync**: Bidirectional real-time sync with online/offline status indicator. Firebase uses null for empty values; app uses -1 internally.
 
-**OCR Processing**: Three-strategy approach in `extractScoresFromText()`:
-- Anchor Pattern: Finds hole number sequences (1-9, 10-18)
-- Line Analysis: Parses scorecard structure
-- Filtering: Identifies valid scores (2-12 range) with sanity checks (total 65-130)
+**Score Entry**: Manual entry with auto-advance on single digits (1-9), arrow key navigation, and backspace to go back.
 
 ### Par Values
 
@@ -61,5 +59,4 @@ DEMO.html     - Static preview page
 ## Known Considerations
 
 - Firebase credentials are in app.js (acceptable for this private use case)
-- OCR results vary by scorecard format; manual review UI is provided
 - Focus restoration logic (`pendingFocusHole`) ensures cursor position survives re-renders

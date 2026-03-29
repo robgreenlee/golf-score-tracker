@@ -36,10 +36,9 @@
                         <label for="entryDate">Date:</label>
                         <input type="date" id="entryDate">
                     </div>
-                    <button id="uploadScorecardBtn" class="btn btn-secondary">📷 Upload Scorecard</button>
-                    <input type="file" id="scorecardUpload" accept="image/*" style="display: none;">
                     <button id="clearRoundBtn" class="btn btn-secondary">Clear</button>
                 </div>
+                <p class="entry-instructions">Tap each hole to enter your score. Scores auto-advance to the next hole. Submit when all 18 are complete.</p>
             </div>
 
             <div id="roundEntryContainer">
@@ -115,27 +114,6 @@
         </div>
     </div>
 
-    <!-- OCR Processing Modal -->
-    <div id="ocrModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h3>Processing Scorecard...</h3>
-            <div id="ocrProgress">
-                <p>Analyzing image...</p>
-                <div class="progress-bar">
-                    <div id="progressFill"></div>
-                </div>
-            </div>
-            <div id="ocrResults" style="display: none;">
-                <h4>Extracted Scores:</h4>
-                <div id="extractedScores"></div>
-                <div class="modal-buttons">
-                    <button id="applyOcrBtn" class="btn btn-primary">Apply Scores</button>
-                    <button id="cancelOcrBtn" class="btn btn-secondary">Cancel</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Round Submission Modal -->
     <div id="roundModal" class="modal">
@@ -163,7 +141,6 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
