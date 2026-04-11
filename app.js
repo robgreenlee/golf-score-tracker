@@ -825,14 +825,14 @@ class FantasyGolf {
         const hint = document.querySelector('.submit-hint');
         const completedHoles = this.currentRoundScores.filter(s => s !== null).length;
 
-        if (completedHoles === 18) {
+        if (completedHoles > 0) {
             btn.disabled = false;
             btn.classList.add('ready');
-            hint.textContent = 'Ready to submit!';
+            hint.textContent = `Ready to submit (${completedHoles}/18 holes)`;
         } else {
             btn.disabled = true;
             btn.classList.remove('ready');
-            hint.textContent = `Enter all 18 holes to submit (${completedHoles}/18 completed)`;
+            hint.textContent = 'Enter at least one hole to submit';
         }
     }
 
@@ -1495,8 +1495,8 @@ class FantasyGolf {
     // ============================================
     showRoundSubmissionModal() {
         const completedHoles = this.currentRoundScores.filter(s => s !== null).length;
-        if (completedHoles !== 18) {
-            alert('Please complete all 18 holes before submitting.');
+        if (completedHoles === 0) {
+            alert('Please enter at least one hole score before submitting.');
             return;
         }
 
